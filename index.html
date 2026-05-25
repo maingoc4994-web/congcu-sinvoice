@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Công cụ Trích xuất & Hóa đơn S-Invoice - Chuẩn Mẫu Khách Lẻ</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
+</head>
+<body class="bg-slate-50 p-8 font-sans">
+
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
+        <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-4 flex items-center">
+            <span class="mr-2">📄</span> Hệ thống Bóc tách Tồn kho & Xuất S-Invoice
+        </h2>
+
+        <div class="mb-8 p-6 border-2 border-dashed border-slate-300 rounded-lg text-center bg-slate-50">
+            <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="processImage()">
+            <label for="imageInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded shadow transition">
+                📸 Tải ảnh phiếu xuất/hóa đơn lên
+            </label>
+            <p id="status-text" class="mt-3 text-sm text-slate-500">Hỗ trợ định dạng JPG, PNG...</p>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-200">
+                <h3 class="text-lg font-semibold text-blue-800 mb-4 flex items-center">
+                    <span class="bg-blue-200 text-blue-800 px-2 py-1 rounded-md mr-2 text-sm">1</span> 
+                    Kết quả quét OCR (Kéo mục này)
+                </h3>
+                <div id="scanned-items" class="space-y-3 min-h-[300px] max-h-[500px] overflow-y-auto pr-2">
+                    <p class="text-slate-400 text-center italic mt-10" id="empty-scan-msg">Chưa có dữ liệu. Hãy tải ảnh lên!</p>
+                </div>
+            </div>
+
+            <div class="bg-emerald-50/50 p-4 rounded-lg border border-emerald-200">
+                <h3 class="text-lg font-semibold text-emerald-800 mb-4 flex items-center">
+                    <span class="bg-emerald-200 text-emerald-800 px-2 py-1 rounded-md mr-2 text-sm">2</span> 
+                    Danh sách xuất hóa đơn (Thả vào đây)
+                </h3>
+                <div id="invoice-items" class="space-y-3 min-h-[300px] border-2 border-dashed border-emerald-300 p-2 rounded max-h-[400px] overflow-y-auto">
+                </div>
+                
+                <div class="mt-6 pt-4 border-t border-emerald-200 text-right">
+                    <p class="text-lg font-bold text-slate-800">Tổng Tiền Hàng: <span id="total-amount" class="text-red-600">0</span> VNĐ</p>
+                    <button onclick="exportToExcel()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded shadow-lg transition w-full md:w-auto flex justify-center items-center">
+                        <span class="mr-2">📊</span> Hoàn thành & Xuất File Import (Excel)
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        new Sortable(document.getElementById('scanned-items'), {
+            group: 'shared', 
+            animation: 150,
+            sort: false
+        });
+
+        new Sortable(document.getElementById('invoice-items'), {
+            group: 'shared',
+            animation: 150,
+            onAdd: function (evt) {
+                let itemEl = evt.item;
+                let itemName = itemEl.getAttribute('data-name');
+                itemEl.innerHTML = `
+                    <div class="w-full bg-white p-3 rounded shadow-sm border border-emerald-100">
+                        <div class="flex justify-between items-center mb-2">
+                            <input type="text" class="font-semibold text-slate-800 item-name-val w-3/4 border-b border-dashed border-slate-300 focus:outline-none focus:border-emerald-500" value="${itemName}">
+                            <button onclick="this.closest('.bg-white').remove(); calculateTotal()" class="text-red-500 hover:text-red-700 text-sm font-bold bg-red-50 px-2 py-1 rounded">Xóa</button>
+                        </div>
+                        <div class="grid grid-cols-4 gap-2 w-full mt-2">
+                            <div>
+                                <label class="text-xs text-slate-500">ĐVT</label>
+                                <input type="text" class="w-full p-2 border rounded text-sm unit-input focus:ring-emerald-500" value="kg">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500">Số lượng</label>
+                                <input type="number" class="w-full p-2 border rounded text-sm qty-input focus:ring-emerald-500" value="1" min="0" step="any" onchange="calculateTotal()" onkeyup="calculateTotal()">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500">Đơn giá</label>
+                                <input type="number" class="w-full p-2 border rounded text-sm price-input focus:ring-emerald-500" value="0" onchange="calculateTotal()" onkeyup="calculateTotal()">
+                            </div>
+                            <div>
+                                <label class="text-xs text-slate-500">Thuế GTGT</label>
+                                <select class="w-full p-2 border rounded text-sm vat-input bg-white">
+                                    <option value="8">8%</option>
+                                    <option value="10">10%</option>
+                                    <option value="5">5%</option>
+                                    <option value="0">0%</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-right">
+                             <span class="text-xs text-slate-500 mr-2">Thành tiền:</span>
+                             <span class="font-bold text-slate-800 total-text">0</span>
+                        </div>
+                    </div>
+                `;
+                itemEl.className = "";
+                calculateTotal();
+            }
+        });
+
+        function calculateTotal() {
+            let grandTotal = 0;
+            const items = document.getElementById('invoice-items').querySelectorAll('.bg-white');
+            items.forEach(item => {
+                const qty = parseFloat(item.querySelector('.qty-input').value) || 0;
+                const price = parseFloat(item.querySelector('.price-input').value) || 0;
+                const lineTotal = qty * price;
+                item.querySelector('.total-text').innerText = lineTotal.toLocaleString('vi-VN');
+                grandTotal += lineTotal;
+            });
+            document.getElementById('total-amount').innerText = grandTotal.toLocaleString('vi-VN');
+        }
+
+        async function processImage() {
+            const fileInput = document.getElementById('imageInput');
+            const statusText = document.getElementById('status-text');
+            const scannedItemsContainer = document.getElementById('scanned-items');
+            
+            if (fileInput.files.length === 0) return;
+
+            statusText.innerHTML = "⏳ Đang phân tích ảnh... (Sẽ mất khoảng 10-20 giây)";
+            statusText.className = "mt-3 text-sm text-blue-600 font-semibold";
+            
+            try {
+                const { data: { text } } = await Tesseract.recognize(
+                    fileInput.files[0],
+                    'vie', 
+                    { logger: m => console.log(m) } 
+                );
+
+                document.getElementById('empty-scan-msg').style.display = 'none';
+                scannedItemsContainer.innerHTML = '';
+
+                const lines = text.split('\n').filter(line => line.trim().length > 1);
+
+                if (lines.length === 0) {
+                    statusText.innerHTML = "⚠️ Quét xong nhưng không đọc được chữ hợp lệ.";
+                    statusText.className = "mt-3 text-sm text-orange-600 font-semibold";
+                    return;
+                }
+
+                lines.forEach((line) => {
+                    let div = document.createElement('div');
+                    div.className = "bg-white p-3 rounded shadow-sm cursor-grab border border-slate-200 hover:border-blue-400 hover:shadow transition flex justify-between items-center";
+                    div.setAttribute('data-name', line.trim());
+                    div.innerHTML = `
+                        <div class="w-full flex items-center">
+                            <span class="text-slate-400 mr-3">⋮⋮</span>
+                            <p class="font-medium text-slate-700 text-sm truncate" title="${line.trim()}">${line.trim()}</p>
+                        </div>
+                    `;
+                    scannedItemsContainer.appendChild(div);
+                });
+
+                statusText.innerHTML = "✅ Quét thành công! Hãy kéo các mặt hàng sang bên phải.";
+                statusText.className = "mt-3 text-sm text-emerald-600 font-semibold";
+
+            } catch (error) {
+                console.error(error);
+                statusText.innerHTML = "❌ Lỗi: Không thể chạy trình quét chữ.";
+                statusText.className = "mt-3 text-sm text-red-600 font-semibold";
+            }
+        }
+
+        function exportToExcel() {
+            const items = document.getElementById('invoice-items').querySelectorAll('.bg-white');
+            if(items.length === 0) {
+                alert("Vui lòng kéo thả ít nhất 1 mặt hàng vào danh sách xuất hóa đơn!");
+                return;
+            }
+
+            // Map cột đúng theo chuẩn S-Invoice
+            let excelData = [[
+                "Tên người mua", 
+                "Tên đơn vị", 
+                "Mã số thuế", 
+                "Địa chỉ", 
+                "Hình thức thanh toán", 
+                "Loại tiền", 
+                "Mã hàng", 
+                "Tên hàng hóa, dịch vụ", 
+                "Đơn vị tính", 
+                "Số lượng", 
+                "Đơn giá", 
+                "Thành tiền", 
+                "Thuế suất (%)", 
+                "Tiền thuế"
+            ]];
+
+            items.forEach((item, index) => {
+                let name = item.querySelector('.item-name-val').value; // Tên hàng
+                let unit = item.querySelector('.unit-input').value; // ĐVT (vd: kg)
+                let qty = parseFloat(item.querySelector('.qty-input').value) || 0;
+                let price = parseFloat(item.querySelector('.price-input').value) || 0;
+                let total = qty * price;
+                let vatRate = parseFloat(item.querySelector('.vat-input').value) || 0;
+                let vatAmount = (total * vatRate) / 100;
+
+                // Tạo mã hàng tự động (MH001, MH002...)
+                let maHang = "MH" + (index + 1).toString().padStart(3, '0');
+
+                excelData.push([
+                    "Khách lẻ không lấy hóa đơn", // Tên người mua
+                    "", // Tên đơn vị (để trống)
+                    "", // MST (để trống)
+                    "", // Địa chỉ (để trống)
+                    "TM/CK", // Hình thức thanh toán
+                    "VND", // Loại tiền
+                    maHang, // Mã hàng
+                    name, // Tên hàng hóa
+                    unit, // Đơn vị tính
+                    qty, // Số lượng
+                    price, // Đơn giá
+                    total, // Thành tiền
+                    vatRate, // Thuế suất
+                    vatAmount // Tiền thuế
+                ]);
+            });
+
+            const ws = XLSX.utils.aoa_to_sheet(excelData);
+            
+            // Căn chỉnh độ rộng cột Excel cho đẹp
+            const wscols = [
+                {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18}, {wch: 10}, 
+                {wch: 12}, {wch: 40}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 15}, 
+                {wch: 12}, {wch: 15}
+            ];
+            ws['!cols'] = wscols;
+
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, ws, "Import_SInvoice");
+            
+            // Tải file về máy
+            XLSX.writeFile(wb, "DuLieu_Up_SInvoice.xlsx");
+        }
+    </script>
+</body>
+</html>
