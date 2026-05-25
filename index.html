@@ -3,35 +3,39 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công cụ Trích xuất & Hóa đơn S-Invoice - Bản PSM 6</title>
+    <title>Công cụ Bóc Tách S-Invoice - Tích hợp Gemini AI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4.0.2/dist/tesseract.min.js"></script>
 </head>
 <body class="bg-slate-50 p-8 font-sans">
 
     <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-4 flex items-center">
-            <span class="mr-2">📄</span> Hệ thống Bóc tách Tồn kho & Xuất S-Invoice
+        <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-4 flex items-center justify-between">
+            <div class="flex items-center"><span class="mr-2">🚀</span> Bóc tách Tồn kho bằng Gemini AI</div>
+            
+            <div class="flex items-center bg-blue-50 p-2 rounded-lg border border-blue-200">
+                <span class="text-xs font-bold text-blue-800 mr-2">🔑 Gemini API Key:</span>
+                <input type="password" id="apiKey" placeholder="Dán API Key vào đây..." class="text-sm p-1 border border-blue-300 rounded w-64 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            </div>
         </h2>
 
-        <div class="mb-8 p-6 border-2 border-dashed border-slate-300 rounded-lg text-center bg-slate-50">
-            <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="processImage()">
-            <label for="imageInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-6 rounded shadow transition">
+        <div class="mb-8 p-6 border-2 border-dashed border-slate-300 rounded-lg text-center bg-slate-50 transition hover:bg-slate-100">
+            <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="processImageWithGemini()">
+            <label for="imageInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-full shadow-md transition">
                 📸 Tải ảnh phiếu xuất/hóa đơn lên
             </label>
-            <p id="status-text" class="mt-3 text-sm text-slate-500">Mẹo: Cắt (crop) sát vào cột Tên Hàng Hóa để đọc chuẩn nhất!</p>
+            <p id="status-text" class="mt-4 text-sm text-slate-500 font-medium">Bây giờ bạn có thể chụp cả bảng biểu có đường kẻ thoải mái!</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-200">
                 <h3 class="text-lg font-semibold text-blue-800 mb-4 flex items-center">
                     <span class="bg-blue-200 text-blue-800 px-2 py-1 rounded-md mr-2 text-sm">1</span> 
-                    Kết quả quét OCR (Kéo mục này)
+                    Kết quả AI bóc tách (Kéo mục này)
                 </h3>
                 <div id="scanned-items" class="space-y-3 min-h-[300px] max-h-[500px] overflow-y-auto pr-2">
-                    <p class="text-slate-400 text-center italic mt-10" id="empty-scan-msg">Chưa có dữ liệu. Hãy tải ảnh lên!</p>
+                    <p class="text-slate-400 text-center italic mt-10" id="empty-scan-msg">Chưa có dữ liệu. Hãy dán API Key và tải ảnh lên!</p>
                 </div>
             </div>
 
@@ -54,6 +58,7 @@
     </div>
 
     <script>
+        // Kích hoạt kéo thả
         new Sortable(document.getElementById('scanned-items'), {
             group: 'shared', 
             animation: 150,
@@ -65,7 +70,14 @@
             animation: 150,
             onAdd: function (evt) {
                 let itemEl = evt.item;
+                
+                // Lấy các dữ liệu mà Gemini đã bóc tách ngầm
                 let itemName = itemEl.getAttribute('data-name');
+                let itemUnit = itemEl.getAttribute('data-unit');
+                let itemQty = itemEl.getAttribute('data-qty');
+                let itemPrice = itemEl.getAttribute('data-price');
+
+                // Chuyển giao diện thành form nhập liệu có sẵn số liệu chuẩn
                 itemEl.innerHTML = `
                     <div class="w-full bg-white p-3 rounded shadow-sm border border-emerald-100">
                         <div class="flex justify-between items-center mb-2">
@@ -75,15 +87,15 @@
                         <div class="grid grid-cols-4 gap-2 w-full mt-2">
                             <div>
                                 <label class="text-xs text-slate-500">ĐVT</label>
-                                <input type="text" class="w-full p-2 border rounded text-sm unit-input focus:ring-emerald-500" value="kg">
+                                <input type="text" class="w-full p-2 border rounded text-sm unit-input focus:ring-emerald-500" value="${itemUnit}">
                             </div>
                             <div>
                                 <label class="text-xs text-slate-500">Số lượng</label>
-                                <input type="number" class="w-full p-2 border rounded text-sm qty-input focus:ring-emerald-500" value="1" min="0" step="any" onchange="calculateTotal()" onkeyup="calculateTotal()">
+                                <input type="number" class="w-full p-2 border rounded text-sm qty-input focus:ring-emerald-500" value="${itemQty}" min="0" step="any" onchange="calculateTotal()" onkeyup="calculateTotal()">
                             </div>
                             <div>
                                 <label class="text-xs text-slate-500">Đơn giá</label>
-                                <input type="number" class="w-full p-2 border rounded text-sm price-input focus:ring-emerald-500" value="0" onchange="calculateTotal()" onkeyup="calculateTotal()">
+                                <input type="number" class="w-full p-2 border rounded text-sm price-input focus:ring-emerald-500" value="${itemPrice}" onchange="calculateTotal()" onkeyup="calculateTotal()">
                             </div>
                             <div>
                                 <label class="text-xs text-slate-500">Thuế GTGT</label>
@@ -119,60 +131,105 @@
             document.getElementById('total-amount').innerText = grandTotal.toLocaleString('vi-VN');
         }
 
-        async function processImage() {
+        // HÀM GỌI GEMINI API ĐỂ ĐỌC ẢNH THÔNG MINH
+        async function processImageWithGemini() {
+            const apiKey = document.getElementById('apiKey').value.trim();
             const fileInput = document.getElementById('imageInput');
             const statusText = document.getElementById('status-text');
             const scannedItemsContainer = document.getElementById('scanned-items');
             
+            if (!apiKey) {
+                alert('Vui lòng nhập Gemini API Key ở góc trên màn hình trước!');
+                fileInput.value = ""; // reset file input
+                return;
+            }
             if (fileInput.files.length === 0) return;
 
-            statusText.innerHTML = "⏳ Đang quét với chế độ đọc bảng (PSM 6)...";
-            statusText.className = "mt-3 text-sm text-blue-600 font-semibold";
-            
+            statusText.innerHTML = "✨ Gemini AI đang phân tích toàn bộ cấu trúc ảnh... (Khoảng 5-10 giây)";
+            statusText.className = "mt-4 text-sm text-blue-600 font-bold animate-pulse";
+            document.getElementById('empty-scan-msg').style.display = 'none';
+            scannedItemsContainer.innerHTML = '';
+
             try {
-                const { data: { text } } = await Tesseract.recognize(
-                    fileInput.files[0],
-                    'vie', 
-                    { logger: m => console.log(m) },
-                    { tessedit_pageseg_mode: 6 } 
-                );
-
-                document.getElementById('empty-scan-msg').style.display = 'none';
-                scannedItemsContainer.innerHTML = '';
-
-                const lines = text.split('\n').filter(line => line.trim().length > 2);
-                let foundValidItem = false;
-
-                lines.forEach((line) => {
-                    let cleanLine = line.replace(/^[|_\-~bmBM\s\d\.\,]+|[|_\-~bmBM\s]+$/gi, '').trim();
-                    
-                    if(cleanLine.length > 2 && /[a-zA-Zàáãạảăắằẳẵặâấầẩẫậèéẹẻẽêềếểễệđìíĩỉịòóõọỏôốồổỗộơớờởỡợùúũụủưứừửữựỳỵỷỹý]/.test(cleanLine)) {
-                        foundValidItem = true;
-                        let div = document.createElement('div');
-                        div.className = "bg-white p-3 rounded shadow-sm cursor-grab border border-slate-200 hover:border-blue-400 hover:shadow transition flex justify-between items-center";
-                        div.setAttribute('data-name', cleanLine);
-                        div.innerHTML = `
-                            <div class="w-full flex items-center">
-                                <span class="text-slate-400 mr-3">⋮⋮</span>
-                                <input type="text" class="font-semibold text-slate-800 w-full bg-transparent border-none focus:outline-none" value="${cleanLine}" readonly>
-                            </div>
-                        `;
-                        scannedItemsContainer.appendChild(div);
-                    }
+                // 1. Chuyển ảnh sang dạng Base64
+                const file = fileInput.files[0];
+                const base64String = await new Promise((resolve) => {
+                    const reader = new FileReader();
+                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
+                    reader.readAsDataURL(file);
                 });
 
-                if (!foundValidItem) {
-                     statusText.innerHTML = "⚠️ AI vẫn bị nhiễu. Hãy cắt ảnh sát vào một cột 'Tên Hàng Hóa' duy nhất!";
-                     statusText.className = "mt-3 text-sm text-orange-600 font-semibold";
-                } else {
-                     statusText.innerHTML = "✅ Quét thành công! Hãy kéo các mặt hàng sang bên phải.";
-                     statusText.className = "mt-3 text-sm text-emerald-600 font-semibold";
+                // 2. Viết câu lệnh (Prompt) yêu cầu Gemini trả về chuẩn định dạng JSON
+                const promptMsg = `
+                    Hãy đóng vai một kế toán viên xuất sắc. Đọc bảng hàng hóa trong ảnh này.
+                    Trích xuất chính xác các mặt hàng, đơn vị tính, số lượng, và đơn giá. 
+                    Nếu cột nào không có số liệu, hãy điền số 0. Nếu không có đơn vị tính, ghi "Cái".
+                    CHỈ TRẢ VỀ một mảng JSON thuần túy (không bọc trong markdown \`\`\`json), với cấu trúc sau:
+                    [{"name": "Tên hàng hóa", "unit": "kg", "qty": 10, "price": 150000}]
+                `;
+
+                // 3. Gửi yêu cầu qua API
+                const endpoint = \`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=\${apiKey}\`;
+                
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{
+                            parts: [
+                                { text: promptMsg },
+                                { inline_data: { mime_type: file.type, data: base64String } }
+                            ]
+                        }]
+                    })
+                });
+
+                const data = await response.json();
+                
+                // Kiểm tra lỗi từ API (như key sai)
+                if (data.error) {
+                    throw new Error(data.error.message);
                 }
+
+                // 4. Lấy chuỗi JSON từ kết quả của Gemini và phân tích
+                let resultText = data.candidates[0].content.parts[0].text;
+                // Dọn dẹp nếu Gemini vô tình trả về kèm chữ "```json"
+                resultText = resultText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
+                
+                const itemsList = JSON.parse(resultText);
+
+                if (itemsList.length === 0) throw new Error("Không tìm thấy mặt hàng nào.");
+
+                // 5. Hiển thị lên giao diện
+                itemsList.forEach((item) => {
+                    let div = document.createElement('div');
+                    div.className = "bg-white p-3 rounded shadow-sm cursor-grab border border-slate-200 hover:border-blue-400 hover:shadow transition flex justify-between items-center";
+                    
+                    // Gắn sẵn data vào thẻ để khi kéo sang sẽ tự động điền form
+                    div.setAttribute('data-name', item.name);
+                    div.setAttribute('data-unit', item.unit || 'Cái');
+                    div.setAttribute('data-qty', item.qty || 0);
+                    div.setAttribute('data-price', item.price || 0);
+
+                    div.innerHTML = `
+                        <div class="w-full">
+                            <div class="flex items-center mb-1">
+                                <span class="text-slate-400 mr-2">⋮⋮</span>
+                                <p class="font-bold text-slate-800 text-sm truncate" title="${item.name}">${item.name}</p>
+                            </div>
+                            <p class="text-xs text-slate-500 pl-6">SL: <span class="font-semibold">${item.qty}</span> ${item.unit} | Đơn giá: <span class="font-semibold">${(item.price || 0).toLocaleString('vi-VN')}</span></p>
+                        </div>
+                    `;
+                    scannedItemsContainer.appendChild(div);
+                });
+
+                statusText.innerHTML = "✅ Quét bằng AI thành công! Hãy kéo các mặt hàng sang bên phải.";
+                statusText.className = "mt-4 text-sm text-emerald-600 font-bold";
 
             } catch (error) {
                 console.error(error);
-                statusText.innerHTML = "❌ Lỗi: Không thể chạy trình quét chữ.";
-                statusText.className = "mt-3 text-sm text-red-600 font-semibold";
+                statusText.innerHTML = "❌ Lỗi: " + error.message;
+                statusText.className = "mt-4 text-sm text-red-600 font-bold";
             }
         }
 
