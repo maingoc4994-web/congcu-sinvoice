@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công cụ Bóc Tách S-Invoice - Tích hợp Gemini AI</title>
+    <title>Công cụ Bóc Tách S-Invoice - Bản Tự Nén Ảnh</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -26,7 +26,7 @@
             <label for="imageInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-full shadow-md transition">
                 📸 Tải ảnh phiếu xuất/hóa đơn lên
             </label>
-            <p id="status-text" class="mt-4 text-sm text-slate-500 font-medium">Lưu ý: API Key của bạn sẽ được lưu an toàn ngay trên trình duyệt này.</p>
+            <p id="status-text" class="mt-4 text-sm text-slate-500 font-medium">Bản cập nhật: Tự động nén ảnh để chống lỗi quá tải mạng.</p>
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -59,7 +59,6 @@
     </div>
 
     <script>
-        // --- TÍNH NĂNG TỰ ĐỘNG LƯU & NHỚ API KEY ---
         document.addEventListener("DOMContentLoaded", () => {
             const savedKey = localStorage.getItem('gemini_api_key');
             if (savedKey) {
@@ -73,7 +72,6 @@
             alert("Đã xóa API Key khỏi bộ nhớ trình duyệt!");
         }
 
-        // Kích hoạt kéo thả
         new Sortable(document.getElementById('scanned-items'), {
             group: 'shared', 
             animation: 150,
@@ -145,7 +143,9 @@
         }
 
         async function processImageWithGemini() {
-            const apiKey = document.getElementById('apiKey').value.trim();
+            let rawApiKey = document.getElementById('apiKey').value;
+            // Xóa sạch các dấu cách (space) nếu lỡ copy nhầm
+            let apiKey = encodeURIComponent(rawApiKey.replace(/\s+/g, ''));
             const fileInput = document.getElementById('imageInput');
             const statusText = document.getElementById('status-text');
             const scannedItemsContainer = document.getElementById('scanned-items');
@@ -156,23 +156,41 @@
                 return;
             }
 
-            // Lưu tự động API Key vào trình duyệt cho những lần sau
             localStorage.setItem('gemini_api_key', apiKey);
 
             if (fileInput.files.length === 0) return;
 
-            statusText.innerHTML = "✨ Gemini AI đang phân tích toàn bộ cấu trúc ảnh... (Khoảng 5-10 giây)";
+            statusText.innerHTML = "✨ Đang nén ảnh và phân tích bằng AI... (Khoảng 5-10 giây)";
             statusText.className = "mt-4 text-sm text-blue-600 font-bold animate-pulse";
             document.getElementById('empty-scan-msg').style.display = 'none';
             scannedItemsContainer.innerHTML = '';
 
             try {
+                // HỆ THỐNG NÉN ẢNH TRƯỚC KHI GỬI
                 const file = fileInput.files[0];
-                const base64String = await new Promise((resolve) => {
-                    const reader = new FileReader();
-                    reader.onloadend = () => resolve(reader.result.split(',')[1]);
-                    reader.readAsDataURL(file);
-                });
+                const img = new Image();
+                img.src = URL.createObjectURL(file);
+                
+                await new Promise((resolve) => { img.onload = resolve; });
+
+                const canvas = document.createElement('canvas');
+                const MAX_WIDTH = 1200; // Nén ảnh xuống tối đa 1200px
+                let width = img.width;
+                let height = img.height;
+
+                if (width > MAX_WIDTH) {
+                    height = Math.round((height * MAX_WIDTH) / width);
+                    width = MAX_WIDTH;
+                }
+
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                // Xuất ra Base64 với chất lượng 80% để siêu nhẹ
+                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
+                const base64String = compressedDataUrl.split(',')[1];
 
                 const promptMsg = `
                     Hãy đóng vai một kế toán viên xuất sắc. Đọc bảng hàng hóa trong ảnh này.
@@ -191,7 +209,7 @@
                         contents: [{
                             parts: [
                                 { text: promptMsg },
-                                { inline_data: { mime_type: file.type, data: base64String } }
+                                { inline_data: { mime_type: "image/jpeg", data: base64String } }
                             ]
                         }]
                     })
