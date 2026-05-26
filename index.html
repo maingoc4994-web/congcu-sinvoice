@@ -3,131 +3,463 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Công cụ Bóc Tách S-Invoice - Bản Tự Nén Ảnh</title>
+    <title>Hệ thống Quản lý Kho & S-Invoice</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
 </head>
-<body class="bg-slate-50 p-8 font-sans">
+<body class="bg-slate-100 p-4 md:p-8 font-sans">
 
-    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-lg p-6">
-        <h2 class="text-2xl font-bold text-slate-800 mb-6 border-b pb-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-            <div class="flex items-center"><span class="mr-2">🚀</span> Bóc tách Tồn kho bằng Gemini AI</div>
+    <div class="max-w-7xl mx-auto bg-white rounded-xl shadow-xl overflow-hidden">
+        
+        <!-- Header & Chọn NNT -->
+        <div class="bg-blue-700 text-white p-6 flex flex-col md:flex-row justify-between items-center gap-4">
+            <h1 class="text-2xl font-bold flex items-center">
+                <span class="mr-3">📦</span> Hệ thống Kho & S-Invoice (Bản Chính Thức)
+            </h1>
             
-            <div class="flex items-center bg-blue-50 p-2 rounded-lg border border-blue-200 w-full md:w-auto">
-                <span class="text-xs font-bold text-blue-800 mr-2 whitespace-nowrap">🔑 API Key:</span>
-                <input type="password" id="apiKey" placeholder="Dán API Key vào đây..." class="text-sm p-1 border border-blue-300 rounded w-full md:w-64 focus:outline-none focus:ring-1 focus:ring-blue-500">
-                <button onclick="clearApiKey()" class="ml-2 text-xs text-red-500 hover:text-red-700 font-semibold" title="Xóa Key đã lưu">Xóa</button>
+            <div class="flex items-center bg-blue-800 p-2 rounded-lg">
+                <label class="font-semibold mr-3 text-blue-200">Đơn vị (NNT):</label>
+                <select id="nnt-select" onchange="changeNNT()" class="text-slate-800 bg-white font-bold p-2 rounded outline-none min-w-[280px]">
+                    <!-- Danh sách NNT sẽ được tự động chèn vào đây -->
+                </select>
             </div>
-        </h2>
-
-        <div class="mb-8 p-6 border-2 border-dashed border-slate-300 rounded-lg text-center bg-slate-50 transition hover:bg-slate-100">
-            <input type="file" id="imageInput" accept="image/*" class="hidden" onchange="processImageWithGemini()">
-            <label for="imageInput" class="cursor-pointer bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 px-8 rounded-full shadow-md transition">
-                📸 Tải ảnh phiếu xuất/hóa đơn lên
-            </label>
-            <p id="status-text" class="mt-4 text-sm text-slate-500 font-medium">Bản cập nhật: Tự động nén ảnh để chống lỗi quá tải mạng.</p>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <div class="bg-blue-50/50 p-4 rounded-lg border border-blue-200">
-                <h3 class="text-lg font-semibold text-blue-800 mb-4 flex items-center">
-                    <span class="bg-blue-200 text-blue-800 px-2 py-1 rounded-md mr-2 text-sm">1</span> 
-                    Kết quả AI bóc tách (Kéo mục này)
-                </h3>
-                <div id="scanned-items" class="space-y-3 min-h-[300px] max-h-[500px] overflow-y-auto pr-2">
-                    <p class="text-slate-400 text-center italic mt-10" id="empty-scan-msg">Chưa có dữ liệu. Hãy tải ảnh lên!</p>
+        <!-- Menu Tabs -->
+        <div class="flex border-b border-slate-200 bg-slate-50">
+            <button onclick="switchTab('export-tab')" id="btn-export-tab" class="flex-1 py-4 font-bold text-blue-700 border-b-4 border-blue-700 bg-white transition">
+                📤 XUẤT HÓA ĐƠN & TRỪ KHO
+            </button>
+            <button onclick="switchTab('import-tab')" id="btn-import-tab" class="flex-1 py-4 font-bold text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition border-b-4 border-transparent">
+                📥 NHẬP KHO & ĐIỀU CHỈNH GIÁ
+            </button>
+        </div>
+
+        <div class="p-6">
+            <!-- ================= TAB 1: XUẤT HÓA ĐƠN ================= -->
+            <div id="export-tab" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                
+                <!-- Cột 1: Danh sách Hàng Tồn Kho -->
+                <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-sm flex flex-col h-[650px]">
+                    <h3 class="text-lg font-bold text-blue-800 mb-4 border-b border-blue-200 pb-2 flex justify-between">
+                        <span>1. Kho Hàng (Kéo hoặc Click đúp)</span>
+                        <span id="htk-count" class="text-sm bg-blue-200 text-blue-800 px-2 py-1 rounded-full">0</span>
+                    </h3>
+                    
+                    <input type="text" id="search-htk" onkeyup="filterHTK()" placeholder="🔍 Tìm kiếm nhanh tên hàng hóa..." class="mb-4 p-3 w-full border border-blue-300 rounded focus:ring-2 focus:ring-blue-500 outline-none font-medium shadow-inner">
+
+                    <div id="htk-list" class="space-y-3 overflow-y-auto flex-1 pr-2">
+                        <!-- Danh mục hàng hóa -->
+                    </div>
+                </div>
+
+                <!-- Cột 2: Bàn làm việc Xuất Hóa Đơn -->
+                <div class="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 shadow-sm flex flex-col h-[650px]">
+                    <h3 class="text-lg font-bold text-emerald-800 mb-4 border-b border-emerald-200 pb-2 flex justify-between">
+                        <span>2. Hóa đơn chờ xuất</span>
+                        <button onclick="clearInvoice()" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded font-bold transition shadow-sm">Làm mới hóa đơn</button>
+                    </h3>
+                    
+                    <div id="invoice-items" class="space-y-3 flex-1 overflow-y-auto border-2 border-dashed border-emerald-300 p-3 rounded-lg bg-emerald-50/30">
+                        <!-- Nơi thả mặt hàng -->
+                    </div>
+                    
+                    <div class="mt-4 pt-4 border-t border-emerald-300">
+                        <div class="flex justify-between items-center mb-4">
+                            <span class="text-lg font-bold text-slate-700">Tổng Tiền Hàng:</span>
+                            <span id="total-amount" class="text-2xl font-black text-red-600">0 VNĐ</span>
+                        </div>
+                        <button onclick="exportAndDeduct()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition flex justify-center items-center text-lg">
+                            <span class="mr-2">✔️</span> CHỐT XUẤT HÓA ĐƠN & TRỪ KHO (EXCEL)
+                        </button>
+                    </div>
                 </div>
             </div>
 
-            <div class="bg-emerald-50/50 p-4 rounded-lg border border-emerald-200">
-                <h3 class="text-lg font-semibold text-emerald-800 mb-4 flex items-center">
-                    <span class="bg-emerald-200 text-emerald-800 px-2 py-1 rounded-md mr-2 text-sm">2</span> 
-                    Danh sách xuất hóa đơn (Thả vào đây)
-                </h3>
-                <div id="invoice-items" class="space-y-3 min-h-[300px] border-2 border-dashed border-emerald-300 p-2 rounded max-h-[400px] overflow-y-auto">
-                </div>
-                
-                <div class="mt-6 pt-4 border-t border-emerald-200 text-right">
-                    <p class="text-lg font-bold text-slate-800">Tổng Tiền Hàng: <span id="total-amount" class="text-red-600">0</span> VNĐ</p>
-                    <button onclick="exportToExcel()" class="mt-4 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-8 rounded shadow-lg transition w-full md:w-auto flex justify-center items-center">
-                        <span class="mr-2">📊</span> Hoàn thành & Xuất File Import (Excel)
+            <!-- ================= TAB 2: NHẬP KHO ================= -->
+            <div id="import-tab" class="hidden">
+                <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-8">
+                    <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
+                        <span class="bg-blue-600 text-white px-2 py-1 rounded-md mr-2 text-sm">+</span> Bổ sung hàng mới hoặc nhập thêm số lượng
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+                        <div class="md:col-span-2">
+                            <label class="text-xs font-bold text-slate-500 uppercase">Tên hàng hóa</label>
+                            <input type="text" id="new-name" placeholder="VD: Ống nhựa Bình Minh..." class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">Đơn vị tính</label>
+                            <input type="text" id="new-unit" placeholder="kg, cái, hộp, cây..." class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">SL Nhập</label>
+                            <input type="number" id="new-qty" value="100" min="0" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                        <div>
+                            <label class="text-xs font-bold text-slate-500 uppercase">Đơn giá bán</label>
+                            <input type="number" id="new-price" value="0" min="0" class="w-full p-3 border rounded-lg focus:ring-2 focus:ring-blue-500 outline-none">
+                        </div>
+                    </div>
+                    <button onclick="addNewItem()" class="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-8 rounded-lg shadow transition w-full md:w-auto">
+                        Cập nhật vào kho
                     </button>
+                </div>
+
+                <!-- Bảng quản lý kho -->
+                <div class="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-sm uppercase">
+                                <th class="p-4 font-bold">Mã Hàng</th>
+                                <th class="p-4 font-bold">Tên Hàng Hóa</th>
+                                <th class="p-4 font-bold">ĐVT</th>
+                                <th class="p-4 font-bold text-right">Tồn Kho</th>
+                                <th class="p-4 font-bold text-right">Giá Cố Định</th>
+                                <th class="p-4 font-bold text-center">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="text-slate-700">
+                            <!-- Injected by JS -->
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>
     </div>
 
     <script>
-        document.addEventListener("DOMContentLoaded", () => {
-            const savedKey = localStorage.getItem('gemini_api_key');
-            if (savedKey) {
-                document.getElementById('apiKey').value = savedKey;
+        // DỮ LIỆU THỰC TẾ ĐƯỢC NẠP VÀO
+        const defaultDB = {
+            "46078002100": {
+                "name": "Nguyễn Chương (MST: 46078002100)",
+                "mst": "46078002100",
+                "inventory": [
+                    { "id": "MH001", "name": "Đá dăm 10x20", "unit": "m3", "qty": 0, "price": 370000 },
+                    { "id": "MH002", "name": "Xi măng bao đa dụng PCB 30 Kaito", "unit": "Tấn", "qty": 0, "price": 1140000 },
+                    { "id": "MH003", "name": "Xi măng bao đa dụng PCB 40 Kaito", "unit": "Tấn", "qty": 0, "price": 1200000 },
+                    { "id": "MH004", "name": "Thép phi 10 Hòa Phát", "unit": "kg", "qty": 1000.0, "price": 17200 },
+                    { "id": "MH005", "name": "Thép phi 12 Hòa Phát", "unit": "kg", "qty": 1090.0, "price": 16900 },
+                    { "id": "MH006", "name": "Thép phi 14 Hoà Phát", "unit": "kg", "qty": 3006.0, "price": 18000 },
+                    { "id": "MH007", "name": "Thép phi 16 Hòa Phát", "unit": "kg", "qty": 3105.0, "price": 18200 },
+                    { "id": "MH008", "name": "Thép phi 6 Hòa Phát", "unit": "kg", "qty": 1443.0, "price": 17800 },
+                    { "id": "MH009", "name": "V(250842)D8SỢI DTY 300/96 SET C", "unit": "kg", "qty": 0, "price": 108500 },
+                    { "id": "MH010", "name": "Xi măng Nghi Sơn PCB 40", "unit": "Tấn", "qty": 30, "price": 1586000 }
+                ]
+            },
+            "46082008168": {
+                "name": "Trương Công Thọ (MST: 46082008168)",
+                "mst": "46082008168",
+                "inventory": [
+                    { "id": "MH001", "name": "Thép phi 12", "unit": "Kg", "qty": 0, "price": 16700 },
+                    { "id": "MH002", "name": "Thép phi 14", "unit": "Kg", "qty": 0, "price": 16700 },
+                    { "id": "MH003", "name": "Thép phi 16", "unit": "Kg", "qty": 0, "price": 16700 },
+                    { "id": "MH004", "name": "Thép phi 6", "unit": "Kg", "qty": 0, "price": 16700 },
+                    { "id": "MH005", "name": "Xi măng Hoàng Thanh Sơn PCB40", "unit": "Tấn", "qty": 0, "price": 1276000 },
+                    { "id": "MH006", "name": "Xi măng Hoàng Thanh Sơn PCB30", "unit": "Tấn", "qty": 67, "price": 1199000 },
+                    { "id": "MH007", "name": "Xi măng Nghi Sơn PCB 40", "unit": "Tấn", "qty": 106.65, "price": 1663200 },
+                    { "id": "MH008", "name": "Cát vàng dùng trong xây dựng", "unit": "M3", "qty": 0, "price": 199700 }
+                ]
+            },
+            "46190007541": {
+                "name": "Cườm Mai (MST: 46190007541)",
+                "mst": "46190007541",
+                "inventory": [
+                    { "id": "MH001", "name": "Thép phi 10", "unit": "Kg", "qty": 0, "price": 15800 },
+                    { "id": "MH002", "name": "Thép phi 16", "unit": "Kg", "qty": 0, "price": 15700 },
+                    { "id": "MH003", "name": "Xi măng bao đa dụng PCB 30 Kaito", "unit": "Tấn", "qty": 15, "price": 1155000 },
+                    { "id": "MH004", "name": "Xi măng Long Sơn PBC30", "unit": "Tấn", "qty": 0, "price": 1280000 },
+                    { "id": "MH005", "name": "Ống nhựa 168 TD 4,0 ly", "unit": "Cây", "qty": 0, "price": 190800 },
+                    { "id": "MH006", "name": "Ống TD PVC 200 x 4.0", "unit": "Mét", "qty": 0, "price": 73100 },
+                    { "id": "MH007", "name": "Co mỏng 49", "unit": "Cái", "qty": 0, "price": 7000 },
+                    { "id": "MH008", "name": "Co mỏng 110", "unit": "Cái", "qty": 0, "price": 44200 },
+                    { "id": "MH009", "name": "Gạch sân vườn định hình 500x500 (6 viên) MTCS52009A1", "unit": "Hộp", "qty": 141, "price": 140300 }
+                ]
+            },
+            "46087020516": {
+                "name": "Huỳnh Văn Nghiệp (MST: 46087020516)",
+                "mst": "46087020516",
+                "inventory": [
+                    { "id": "MH001", "name": "Thép phi 10", "unit": "Kg", "qty": 0, "price": 15100 },
+                    { "id": "MH002", "name": "Xi Măng Kim Đỉnh PCB30", "unit": "Tấn", "qty": 0, "price": 1603000 },
+                    { "id": "MH003", "name": "Gạch đặc nhỏ", "unit": "Viên", "qty": 4403, "price": 1900 },
+                    { "id": "MH004", "name": "Gạch 6 lỗ nhỏ", "unit": "Viên", "qty": 1497, "price": 2300 },
+                    { "id": "MH005", "name": "Gạch 6 lỗ nhỏ 1/2", "unit": "Viên", "qty": 148, "price": 1700 },
+                    { "id": "MH006", "name": "Xi măng Long Sơn Pcb30", "unit": "Tấn", "qty": 20, "price": 1700000 },
+                    { "id": "MH007", "name": "Xi măng bao đa dụng PCB 30 Kaito", "unit": "Tấn", "qty": 0, "price": 1700000 },
+                    { "id": "MH008", "name": "GẠCH, GKH 190x190x95, 9521", "unit": "Thùng", "qty": 0, "price": 289800 },
+                    { "id": "MH009", "name": "Gạch đồng tiền A1", "unit": "Viên", "qty": 0, "price": 18900 },
+                    { "id": "MH010", "name": "Gạch hạ uydi A1", "unit": "Viên", "qty": 0, "price": 18900 }
+                ]
+            },
+            "46159009984": {
+                "name": "Nguyễn Thị Sen (MST: 46159009984)",
+                "mst": "46159009984",
+                "inventory": [
+                    { "id": "MH001", "name": "Xi măng Bỉm Sơn PCB30", "unit": "Tấn", "qty": 18, "price": 2050000 },
+                    { "id": "MH002", "name": "Gạch bậc cầu thang 1200x300 cotto men đen chấm bi trắng A1", "unit": "Viên", "qty": 0, "price": 250800 },
+                    { "id": "MH003", "name": "Gạch cổ bậc 1200x150 cotto men đen chấm bi trắng A1", "unit": "Viên", "qty": 0, "price": 59600 }
+                ]
+            },
+            "46086007277": {
+                "name": "HKD Thanh Thoạn (MST: 46086007277)",
+                "mst": "46086007277",
+                "inventory": [
+                    { "id": "MH001", "name": "Xi măng Nghi Sơn PCB 40", "unit": "tấn", "qty": 60, "price": 1692900 },
+                    { "id": "MH002", "name": "Cát vàng dùng trong xây dựng", "unit": "M3", "qty": 5, "price": 199700 },
+                    { "id": "MH003", "name": "Đá dăm 10x20 ( tại máy xay Khe Băng )", "unit": "m³", "qty": 67.9, "price": 352000 },
+                    { "id": "MH004", "name": "Xi măng Tân Trường bao PCB40", "unit": "tấn", "qty": 10, "price": 1100000 },
+                    { "id": "MH005", "name": "Xi măng Tân Trường bao PCB30", "unit": "tấn", "qty": 11.1, "price": 1018500 },
+                    { "id": "MH006", "name": "Thép phi 10 Hòa Phát", "unit": "kg", "qty": 2898.0, "price": 18600 }
+                ]
+            },
+            "46169001328": {
+                "name": "Châu Thị Vân (MST: 46169001328)",
+                "mst": "46169001328",
+                "inventory": [
+                    { "id": "MH001", "name": "Bưởi", "unit": "kg", "qty": 633.6, "price": 35000 },
+                    { "id": "MH002", "name": "Cam", "unit": "kg", "qty": 1291.92, "price": 25000 },
+                    { "id": "MH003", "name": "Chanh", "unit": "kg", "qty": 37, "price": 45000 },
+                    { "id": "MH004", "name": "Dưa hấu", "unit": "kg", "qty": 22.3, "price": 12000 },
+                    { "id": "MH005", "name": "Dưa hấu lai", "unit": "kg", "qty": 184.8, "price": 14000 },
+                    { "id": "MH006", "name": "Dưa lưới", "unit": "kg", "qty": 254.7, "price": 35000 },
+                    { "id": "MH007", "name": "Kiwi", "unit": "kg", "qty": 46.54, "price": 200000 },
+                    { "id": "MH008", "name": "Lê", "unit": "kg", "qty": 495.57, "price": 40000 },
+                    { "id": "MH009", "name": "Mận", "unit": "kg", "qty": 244.5, "price": 45000 },
+                    { "id": "MH010", "name": "Nhãn", "unit": "kg", "qty": 400.9, "price": 45000 },
+                    { "id": "MH011", "name": "Nho", "unit": "kg", "qty": 596.44, "price": 200000 },
+                    { "id": "MH012", "name": "Quýt", "unit": "kg", "qty": 310.5, "price": 50000 },
+                    { "id": "MH013", "name": "Táo gala", "unit": "kg", "qty": 6.16, "price": 70000 },
+                    { "id": "MH014", "name": "Thanh long", "unit": "kg", "qty": 93, "price": 20000 },
+                    { "id": "MH015", "name": "Thơm quả", "unit": "kg", "qty": 385.72, "price": 22000 },
+                    { "id": "MH016", "name": "Vú sữa", "unit": "kg", "qty": 17.9, "price": 45000 }
+                ]
             }
+        };
+
+        let db = {};
+        let currentNNT = "";
+
+        // --- KHỞI TẠO HỆ THỐNG ---
+        document.addEventListener("DOMContentLoaded", () => {
+            // Đã đổi key lưu trữ thành v3 để ép nạp data thật mới nhất
+            const savedDB = localStorage.getItem('invoice_db_v3');
+            if (savedDB) {
+                db = JSON.parse(savedDB);
+            } else {
+                db = defaultDB;
+                saveDB();
+            }
+
+            const selectEl = document.getElementById('nnt-select');
+            for (let key in db) {
+                let option = document.createElement('option');
+                option.value = key;
+                option.text = db[key].name;
+                selectEl.appendChild(option);
+            }
+            
+            currentNNT = selectEl.value;
+            renderHTK();
+            renderImportTable();
+
+            // Cấu hình Kéo Thả
+            new Sortable(document.getElementById('htk-list'), {
+                group: {
+                    name: 'shared',
+                    pull: 'clone', 
+                    put: false
+                },
+                animation: 150,
+                sort: false
+            });
+
+            new Sortable(document.getElementById('invoice-items'), {
+                group: 'shared',
+                animation: 150,
+                onAdd: function (evt) {
+                    let itemEl = evt.item;
+                    let id = itemEl.getAttribute('data-id');
+                    let itemData = db[currentNNT].inventory.find(i => i.id === id);
+
+                    itemEl.innerHTML = `
+                        <div class="w-full bg-white p-3 rounded shadow-sm border-l-4 border-emerald-500 relative">
+                            <div class="flex justify-between items-center mb-2">
+                                <span class="font-bold text-slate-800 item-name-val">${itemData.name}</span>
+                                <button onclick="this.closest('.bg-white').parentElement.remove(); calculateTotal()" class="text-red-500 hover:text-red-700 text-sm font-bold bg-red-50 px-2 py-1 rounded">Xóa bỏ</button>
+                            </div>
+                            
+                            <input type="hidden" class="item-id-val" value="${itemData.id}">
+                            <input type="hidden" class="unit-input" value="${itemData.unit}">
+
+                            <div class="grid grid-cols-3 gap-2 w-full mt-2">
+                                <div>
+                                    <label class="text-xs text-slate-500 font-bold">Tồn kho hiện tại</label>
+                                    <div class="w-full p-2 bg-slate-100 rounded text-sm text-slate-600 font-mono">${itemData.qty} ${itemData.unit}</div>
+                                </div>
+                                <div>
+                                    <label class="text-xs text-blue-600 font-bold">SL XUẤT</label>
+                                    <input type="number" class="w-full p-2 border border-blue-300 rounded text-sm font-bold text-blue-700 qty-input focus:ring-2 focus:ring-blue-500" value="1" min="1" max="${itemData.qty}" step="any" onchange="calculateTotal()" onkeyup="calculateTotal()">
+                                </div>
+                                <div>
+                                    <label class="text-xs text-slate-500 font-bold">Đơn giá bán</label>
+                                    <input type="number" class="w-full p-2 border border-slate-300 rounded text-sm price-input focus:ring-2 focus:ring-blue-500" value="${itemData.price}" onchange="calculateTotal()" onkeyup="calculateTotal()">
+                                </div>
+                            </div>
+                            <div class="mt-3 flex justify-between items-center">
+                                 <div>
+                                    <label class="text-xs text-slate-500 mr-2">Thuế GTGT:</label>
+                                    <select class="p-1 border rounded text-xs vat-input bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+                                        <option value="8">8%</option>
+                                        <option value="10">10%</option>
+                                        <option value="5">5%</option>
+                                        <option value="0">0%</option>
+                                        <option value="-1">Không chịu thuế</option>
+                                    </select>
+                                 </div>
+                                 <div class="text-right">
+                                     <span class="text-xs text-slate-500 mr-2">Thành tiền:</span>
+                                     <span class="font-bold text-red-600 text-lg total-text">0</span>
+                                 </div>
+                            </div>
+                        </div>
+                    `;
+                    itemEl.className = "mb-3"; 
+                    calculateTotal();
+                }
+            });
         });
 
-        function clearApiKey() {
-            localStorage.removeItem('gemini_api_key');
-            document.getElementById('apiKey').value = '';
-            alert("Đã xóa API Key khỏi bộ nhớ trình duyệt!");
+        function saveDB() {
+            localStorage.setItem('invoice_db_v3', JSON.stringify(db));
         }
 
-        new Sortable(document.getElementById('scanned-items'), {
-            group: 'shared', 
-            animation: 150,
-            sort: false
-        });
+        function changeNNT() {
+            currentNNT = document.getElementById('nnt-select').value;
+            document.getElementById('search-htk').value = ""; 
+            clearInvoice();
+            renderHTK();
+            renderImportTable();
+        }
 
-        new Sortable(document.getElementById('invoice-items'), {
-            group: 'shared',
-            animation: 150,
-            onAdd: function (evt) {
-                let itemEl = evt.item;
-                
-                let itemName = itemEl.getAttribute('data-name');
-                let itemUnit = itemEl.getAttribute('data-unit');
-                let itemQty = itemEl.getAttribute('data-qty');
-                let itemPrice = itemEl.getAttribute('data-price');
+        function switchTab(tabId) {
+            document.getElementById('export-tab').classList.add('hidden');
+            document.getElementById('import-tab').classList.add('hidden');
+            document.getElementById(tabId).classList.remove('hidden');
 
-                itemEl.innerHTML = `
-                    <div class="w-full bg-white p-3 rounded shadow-sm border border-emerald-100">
-                        <div class="flex justify-between items-center mb-2">
-                            <input type="text" class="font-semibold text-slate-800 item-name-val w-3/4 border-b border-dashed border-slate-300 focus:outline-none focus:border-emerald-500" value="${itemName}">
-                            <button onclick="this.closest('.bg-white').remove(); calculateTotal()" class="text-red-500 hover:text-red-700 text-sm font-bold bg-red-50 px-2 py-1 rounded">Xóa</button>
+            const btnExp = document.getElementById('btn-export-tab');
+            const btnImp = document.getElementById('btn-import-tab');
+
+            if(tabId === 'export-tab') {
+                btnExp.className = "flex-1 py-4 font-bold text-blue-700 border-b-4 border-blue-700 bg-white transition";
+                btnImp.className = "flex-1 py-4 font-bold text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition border-b-4 border-transparent";
+            } else {
+                btnImp.className = "flex-1 py-4 font-bold text-emerald-600 border-b-4 border-emerald-600 bg-white transition";
+                btnExp.className = "flex-1 py-4 font-bold text-slate-500 hover:text-blue-600 hover:bg-blue-50 transition border-b-4 border-transparent";
+            }
+        }
+
+        // Hỗ trợ Click đúp để chuyển hàng sang thay vì chỉ kéo thả
+        function handleDoubleClick(id) {
+            let itemData = db[currentNNT].inventory.find(i => i.id === id);
+            if(itemData.qty <= 0) return;
+
+            let invoiceContainer = document.getElementById('invoice-items');
+            let itemEl = document.createElement('div');
+            itemEl.className = "mb-3";
+            itemEl.innerHTML = `
+                <div class="w-full bg-white p-3 rounded shadow-sm border-l-4 border-emerald-500 relative">
+                    <div class="flex justify-between items-center mb-2">
+                        <span class="font-bold text-slate-800 item-name-val">${itemData.name}</span>
+                        <button onclick="this.closest('.bg-white').parentElement.remove(); calculateTotal()" class="text-red-500 hover:text-red-700 text-sm font-bold bg-red-50 px-2 py-1 rounded">Xóa bỏ</button>
+                    </div>
+                    
+                    <input type="hidden" class="item-id-val" value="${itemData.id}">
+                    <input type="hidden" class="unit-input" value="${itemData.unit}">
+
+                    <div class="grid grid-cols-3 gap-2 w-full mt-2">
+                        <div>
+                            <label class="text-xs text-slate-500 font-bold">Tồn kho hiện tại</label>
+                            <div class="w-full p-2 bg-slate-100 rounded text-sm text-slate-600 font-mono">${itemData.qty} ${itemData.unit}</div>
                         </div>
-                        <div class="grid grid-cols-4 gap-2 w-full mt-2">
-                            <div>
-                                <label class="text-xs text-slate-500">ĐVT</label>
-                                <input type="text" class="w-full p-2 border rounded text-sm unit-input focus:ring-emerald-500" value="${itemUnit}">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-500">Số lượng</label>
-                                <input type="number" class="w-full p-2 border rounded text-sm qty-input focus:ring-emerald-500" value="${itemQty}" min="0" step="any" onchange="calculateTotal()" onkeyup="calculateTotal()">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-500">Đơn giá</label>
-                                <input type="number" class="w-full p-2 border rounded text-sm price-input focus:ring-emerald-500" value="${itemPrice}" onchange="calculateTotal()" onkeyup="calculateTotal()">
-                            </div>
-                            <div>
-                                <label class="text-xs text-slate-500">Thuế GTGT</label>
-                                <select class="w-full p-2 border rounded text-sm vat-input bg-white">
-                                    <option value="8">8%</option>
-                                    <option value="10">10%</option>
-                                    <option value="5">5%</option>
-                                    <option value="0">0%</option>
-                                </select>
-                            </div>
+                        <div>
+                            <label class="text-xs text-blue-600 font-bold">SL XUẤT</label>
+                            <input type="number" class="w-full p-2 border border-blue-300 rounded text-sm font-bold text-blue-700 qty-input focus:ring-2 focus:ring-blue-500" value="1" min="1" max="${itemData.qty}" step="any" onchange="calculateTotal()" onkeyup="calculateTotal()">
                         </div>
-                        <div class="mt-2 text-right">
-                             <span class="text-xs text-slate-500 mr-2">Thành tiền:</span>
-                             <span class="font-bold text-slate-800 total-text">0</span>
+                        <div>
+                            <label class="text-xs text-slate-500 font-bold">Đơn giá bán</label>
+                            <input type="number" class="w-full p-2 border border-slate-300 rounded text-sm price-input focus:ring-2 focus:ring-blue-500" value="${itemData.price}" onchange="calculateTotal()" onkeyup="calculateTotal()">
                         </div>
                     </div>
-                `;
-                itemEl.className = "";
-                calculateTotal();
-            }
-        });
+                    <div class="mt-3 flex justify-between items-center">
+                            <div>
+                            <label class="text-xs text-slate-500 mr-2">Thuế GTGT:</label>
+                            <select class="p-1 border rounded text-xs vat-input bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+                                <option value="8">8%</option>
+                                <option value="10">10%</option>
+                                <option value="5">5%</option>
+                                <option value="0">0%</option>
+                                <option value="-1">Không chịu thuế</option>
+                            </select>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-slate-500 mr-2">Thành tiền:</span>
+                                <span class="font-bold text-red-600 text-lg total-text">0</span>
+                            </div>
+                    </div>
+                </div>
+            `;
+            invoiceContainer.appendChild(itemEl);
+            calculateTotal();
+        }
+
+        function renderHTK(filterText = "") {
+            const htkList = document.getElementById('htk-list');
+            htkList.innerHTML = "";
+            let inventory = db[currentNNT].inventory;
+            let count = 0;
+
+            inventory.forEach(item => {
+                if(item.name.toLowerCase().includes(filterText.toLowerCase())) {
+                    count++;
+                    let div = document.createElement('div');
+                    let canDrag = item.qty > 0 ? "cursor-grab hover:border-blue-500 hover:shadow-md" : "opacity-50 cursor-not-allowed bg-slate-100";
+                    
+                    div.className = `bg-white p-3 rounded shadow-sm border border-slate-200 transition flex justify-between items-center ${canDrag}`;
+                    if(item.qty > 0) { 
+                        div.setAttribute('data-id', item.id); 
+                        div.ondblclick = () => handleDoubleClick(item.id); 
+                    }
+
+                    div.innerHTML = `
+                        <div class="w-full flex items-center">
+                            <span class="text-slate-400 mr-3 cursor-grab text-lg">⋮⋮</span>
+                            <div class="w-full">
+                                <p class="font-bold text-slate-800 text-sm truncate" title="${item.name}">${item.name}</p>
+                                <div class="flex justify-between items-center mt-1">
+                                    <span class="text-xs font-bold ${item.qty > 0 ? 'text-emerald-700 bg-emerald-100' : 'text-red-700 bg-red-100'} px-2 py-0.5 rounded shadow-sm">
+                                        Tồn: ${item.qty.toLocaleString('vi-VN')} ${item.unit}
+                                    </span>
+                                    <span class="text-xs text-slate-500 font-semibold">Giá: ${item.price.toLocaleString('vi-VN')} đ</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    htkList.appendChild(div);
+                }
+            });
+            document.getElementById('htk-count').innerText = count;
+        }
+
+        function filterHTK() {
+            let text = document.getElementById('search-htk').value;
+            renderHTK(text);
+        }
+
+        function clearInvoice() {
+            document.getElementById('invoice-items').innerHTML = "";
+            calculateTotal();
+        }
 
         function calculateTotal() {
             let grandTotal = 0;
@@ -142,127 +474,104 @@
             document.getElementById('total-amount').innerText = grandTotal.toLocaleString('vi-VN');
         }
 
-        async function processImageWithGemini() {
-            let rawApiKey = document.getElementById('apiKey').value;
-            // Xóa sạch các dấu cách (space) nếu lỡ copy nhầm
-            let apiKey = encodeURIComponent(rawApiKey.replace(/\s+/g, ''));
-            const fileInput = document.getElementById('imageInput');
-            const statusText = document.getElementById('status-text');
-            const scannedItemsContainer = document.getElementById('scanned-items');
-            
-            if (!apiKey) {
-                alert('Vui lòng dán Gemini API Key của bạn vào ô phía trên!');
-                fileInput.value = ""; 
+        function renderImportTable() {
+            const tbody = document.getElementById('inventory-table-body');
+            tbody.innerHTML = "";
+            let inventory = db[currentNNT].inventory;
+
+            inventory.forEach(item => {
+                let tr = document.createElement('tr');
+                tr.className = "border-b border-slate-100 hover:bg-slate-50 transition";
+                tr.innerHTML = `
+                    <td class="p-4 text-sm font-mono text-slate-500">${item.id}</td>
+                    <td class="p-4 font-semibold text-slate-800">${item.name}</td>
+                    <td class="p-4 text-sm font-medium text-slate-600">${item.unit}</td>
+                    <td class="p-4 font-bold text-right text-blue-700 bg-blue-50/30">${item.qty.toLocaleString('vi-VN')}</td>
+                    <td class="p-4 text-right text-sm font-semibold">${item.price.toLocaleString('vi-VN')} đ</td>
+                    <td class="p-4 text-center">
+                        <button onclick="deleteItem('${item.id}')" class="text-red-500 hover:text-red-700 font-bold text-sm bg-red-50 hover:bg-red-100 px-3 py-1 rounded transition">Xóa</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function addNewItem() {
+            let name = document.getElementById('new-name').value.trim();
+            let unit = document.getElementById('new-unit').value.trim();
+            let qty = parseFloat(document.getElementById('new-qty').value) || 0;
+            let price = parseFloat(document.getElementById('new-price').value) || 0;
+
+            if(!name || !unit) {
+                alert("Vui lòng điền đủ Tên hàng hóa và Đơn vị tính!");
                 return;
             }
 
-            localStorage.setItem('gemini_api_key', apiKey);
+            let inventory = db[currentNNT].inventory;
+            let existingItem = inventory.find(i => i.name.toLowerCase() === name.toLowerCase());
 
-            if (fileInput.files.length === 0) return;
+            if(existingItem) {
+                existingItem.qty += qty;
+                existingItem.price = price > 0 ? price : existingItem.price;
+                alert(`Đã cộng thêm ${qty} ${unit} vào mặt hàng: ${name}\nTồn kho mới: ${existingItem.qty} ${unit}`);
+            } else {
+                let newId = "MH" + (inventory.length + 1).toString().padStart(3, '0');
+                inventory.push({ id: newId, name: name, unit: unit, qty: qty, price: price });
+                alert(`Đã tạo mới mặt hàng: ${name} vào kho!`);
+            }
 
-            statusText.innerHTML = "✨ Đang nén ảnh và phân tích bằng AI... (Khoảng 5-10 giây)";
-            statusText.className = "mt-4 text-sm text-blue-600 font-bold animate-pulse";
-            document.getElementById('empty-scan-msg').style.display = 'none';
-            scannedItemsContainer.innerHTML = '';
+            saveDB();
+            renderImportTable();
+            renderHTK(document.getElementById('search-htk').value);
+            
+            document.getElementById('new-name').value = "";
+            document.getElementById('new-unit').value = "";
+            document.getElementById('new-qty').value = "100";
+            document.getElementById('new-price').value = "0";
+            document.getElementById('new-name').focus();
+        }
 
-            try {
-                // HỆ THỐNG NÉN ẢNH TRƯỚC KHI GỬI
-                const file = fileInput.files[0];
-                const img = new Image();
-                img.src = URL.createObjectURL(file);
-                
-                await new Promise((resolve) => { img.onload = resolve; });
-
-                const canvas = document.createElement('canvas');
-                const MAX_WIDTH = 1200; // Nén ảnh xuống tối đa 1200px
-                let width = img.width;
-                let height = img.height;
-
-                if (width > MAX_WIDTH) {
-                    height = Math.round((height * MAX_WIDTH) / width);
-                    width = MAX_WIDTH;
-                }
-
-                canvas.width = width;
-                canvas.height = height;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(img, 0, 0, width, height);
-
-                // Xuất ra Base64 với chất lượng 80% để siêu nhẹ
-                const compressedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
-                const base64String = compressedDataUrl.split(',')[1];
-
-                const promptMsg = `
-                    Hãy đóng vai một kế toán viên xuất sắc. Đọc bảng hàng hóa trong ảnh này.
-                    Trích xuất chính xác các mặt hàng, đơn vị tính, số lượng, và đơn giá. 
-                    Nếu cột nào không có số liệu, hãy điền số 0. Nếu không có đơn vị tính, ghi "Cái".
-                    CHỈ TRẢ VỀ một mảng JSON thuần túy (không bọc trong markdown \`\`\`json), với cấu trúc sau:
-                    [{"name": "Tên hàng hóa", "unit": "kg", "qty": 10, "price": 150000}]
-                `;
-
-                const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`;
-                
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [
-                                { text: promptMsg },
-                                { inline_data: { mime_type: "image/jpeg", data: base64String } }
-                            ]
-                        }]
-                    })
-                });
-
-                const data = await response.json();
-                
-                if (data.error) {
-                    throw new Error(data.error.message);
-                }
-
-                let resultText = data.candidates[0].content.parts[0].text;
-                resultText = resultText.replace(/\`\`\`json/g, '').replace(/\`\`\`/g, '').trim();
-                
-                const itemsList = JSON.parse(resultText);
-
-                if (itemsList.length === 0) throw new Error("Không tìm thấy mặt hàng nào.");
-
-                itemsList.forEach((item) => {
-                    let div = document.createElement('div');
-                    div.className = "bg-white p-3 rounded shadow-sm cursor-grab border border-slate-200 hover:border-blue-400 hover:shadow transition flex justify-between items-center";
-                    
-                    div.setAttribute('data-name', item.name);
-                    div.setAttribute('data-unit', item.unit || 'Cái');
-                    div.setAttribute('data-qty', item.qty || 0);
-                    div.setAttribute('data-price', item.price || 0);
-
-                    div.innerHTML = `
-                        <div class="w-full">
-                            <div class="flex items-center mb-1">
-                                <span class="text-slate-400 mr-2">⋮⋮</span>
-                                <p class="font-bold text-slate-800 text-sm truncate" title="${item.name}">${item.name}</p>
-                            </div>
-                            <p class="text-xs text-slate-500 pl-6">SL: <span class="font-semibold">${item.qty}</span> ${item.unit} | Đơn giá: <span class="font-semibold">${(item.price || 0).toLocaleString('vi-VN')}</span></p>
-                        </div>
-                    `;
-                    scannedItemsContainer.appendChild(div);
-                });
-
-                statusText.innerHTML = "✅ Quét bằng AI thành công! Hãy kéo các mặt hàng sang bên phải.";
-                statusText.className = "mt-4 text-sm text-emerald-600 font-bold";
-
-            } catch (error) {
-                console.error(error);
-                statusText.innerHTML = "❌ Lỗi: " + error.message;
-                statusText.className = "mt-4 text-sm text-red-600 font-bold";
+        function deleteItem(id) {
+            if(confirm("Bạn có chắc chắn muốn xóa vĩnh viễn mặt hàng này khỏi kho?")) {
+                db[currentNNT].inventory = db[currentNNT].inventory.filter(i => i.id !== id);
+                saveDB();
+                renderImportTable();
+                renderHTK(document.getElementById('search-htk').value);
             }
         }
 
-        function exportToExcel() {
-            const items = document.getElementById('invoice-items').querySelectorAll('.bg-white');
-            if(items.length === 0) {
-                alert("Vui lòng kéo thả ít nhất 1 mặt hàng vào danh sách xuất hóa đơn!");
+        function exportAndDeduct() {
+            const itemEls = document.getElementById('invoice-items').querySelectorAll('.bg-white');
+            if(itemEls.length === 0) {
+                alert("Bạn chưa chọn mặt hàng nào để xuất hóa đơn!");
+                return;
+            }
+
+            let inventory = db[currentNNT].inventory;
+            let errors = [];
+            let itemsToExport = [];
+
+            itemEls.forEach(el => {
+                let id = el.querySelector('.item-id-val').value;
+                let name = el.querySelector('.item-name-val').innerText;
+                let sellQty = parseFloat(el.querySelector('.qty-input').value) || 0;
+                let price = parseFloat(el.querySelector('.price-input').value) || 0;
+                let unit = el.querySelector('.unit-input').value;
+                let vatRate = parseFloat(el.querySelector('.vat-input').value); 
+                
+                let dbItem = inventory.find(i => i.id === id);
+                
+                if (sellQty <= 0) {
+                    errors.push(`- [${name}]: Số lượng xuất không hợp lệ (phải > 0).`);
+                } else if (sellQty > dbItem.qty) {
+                    errors.push(`- [${name}]: Vượt quá hàng trong kho (Kho hiện tại chỉ có ${dbItem.qty} ${unit}).`);
+                } else {
+                    itemsToExport.push({ id, dbItem, name, unit, sellQty, price, vatRate });
+                }
+            });
+
+            if(errors.length > 0) {
+                alert("⚠️ PHÁT HIỆN LỖI KHI XUẤT HÓA ĐƠN:\n\n" + errors.join("\n") + "\n\nVui lòng chỉnh lại số lượng trước khi chốt xuất.");
                 return;
             }
 
@@ -272,25 +581,23 @@
                 "Đơn giá", "Thành tiền", "Thuế suất (%)", "Tiền thuế"
             ]];
 
-            items.forEach((item, index) => {
-                let name = item.querySelector('.item-name-val').value; 
-                let unit = item.querySelector('.unit-input').value; 
-                let qty = parseFloat(item.querySelector('.qty-input').value) || 0;
-                let price = parseFloat(item.querySelector('.price-input').value) || 0;
-                let total = qty * price;
-                let vatRate = parseFloat(item.querySelector('.vat-input').value) || 0;
-                let vatAmount = (total * vatRate) / 100;
-
-                let maHang = "MH" + (index + 1).toString().padStart(3, '0');
+            itemsToExport.forEach((item, index) => {
+                let total = item.sellQty * item.price;
+                let vatRateStr = item.vatRate === -1 ? -1 : item.vatRate; // -1 cho KCT
+                let vatAmount = item.vatRate === -1 ? 0 : (total * item.vatRate) / 100;
 
                 excelData.push([
                     "Khách lẻ không lấy hóa đơn", "", "", "", "TM/CK", "VND", 
-                    maHang, name, unit, qty, price, total, vatRate, vatAmount 
+                    item.id, item.name, item.unit, item.sellQty, item.price, total, vatRateStr, vatAmount 
                 ]);
+
+                // Trừ kho
+                item.dbItem.qty -= item.sellQty;
             });
 
+            saveDB();
+
             const ws = XLSX.utils.aoa_to_sheet(excelData);
-            
             const wscols = [
                 {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18}, {wch: 10}, 
                 {wch: 12}, {wch: 40}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 15}, 
@@ -301,7 +608,13 @@
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Import_SInvoice");
             
-            XLSX.writeFile(wb, "DuLieu_Up_SInvoice.xlsx");
+            let dateStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
+            XLSX.writeFile(wb, `DuLieuXuat_${db[currentNNT].mst}_${dateStr}.xlsx`);
+
+            alert("✅ LẬP HÓA ĐƠN THÀNH CÔNG!\n- File Excel đã được tải về máy.\n- Hàng tồn kho đã được trừ tự động.");
+            clearInvoice();
+            renderHTK(document.getElementById('search-htk').value);
+            renderImportTable();
         }
     </script>
 </body>
