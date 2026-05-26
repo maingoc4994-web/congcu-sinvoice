@@ -14,7 +14,7 @@
         
         <div class="bg-blue-700 text-white p-6 flex flex-col md:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold flex items-center">
-                <span class="mr-3">📦</span> Hệ thống Kho & S-Invoice (Hộ Kinh Doanh)
+                <span class="mr-3">📦</span> Kho & S-Invoice (Bản Chuẩn File Mẫu Viettel)
             </h1>
             
             <div class="flex items-center bg-blue-800 p-2 rounded-lg">
@@ -118,7 +118,6 @@
     </div>
 
     <script>
-        // Copy lại đúng bộ DB thực tế vừa nạp để dự phòng
         const defaultDB = {
             "46078002100": { "name": "Nguyễn Chương (MST: 46078002100)", "mst": "46078002100", "inventory": [ { "id": "MH001", "name": "Đá dăm 10x20", "unit": "m3", "qty": 0, "price": 370000 }, { "id": "MH002", "name": "Xi măng bao đa dụng PCB 30 Kaito", "unit": "Tấn", "qty": 0, "price": 1140000 }, { "id": "MH003", "name": "Xi măng bao đa dụng PCB 40 Kaito", "unit": "Tấn", "qty": 0, "price": 1200000 }, { "id": "MH004", "name": "Thép phi 10 Hòa Phát", "unit": "kg", "qty": 1000.0, "price": 17200 }, { "id": "MH005", "name": "Thép phi 12 Hòa Phát", "unit": "kg", "qty": 1090.0, "price": 16900 }, { "id": "MH006", "name": "Thép phi 14 Hoà Phát", "unit": "kg", "qty": 3006.0, "price": 18000 }, { "id": "MH007", "name": "Thép phi 16 Hòa Phát", "unit": "kg", "qty": 3105.0, "price": 18200 }, { "id": "MH008", "name": "Thép phi 6 Hòa Phát", "unit": "kg", "qty": 1443.0, "price": 17800 }, { "id": "MH009", "name": "V(250842)D8SỢI DTY 300/96 SET C", "unit": "kg", "qty": 0, "price": 108500 }, { "id": "MH010", "name": "Xi măng Nghi Sơn PCB 40", "unit": "Tấn", "qty": 30, "price": 1586000 } ] },
             "46082008168": { "name": "Trương Công Thọ (MST: 46082008168)", "mst": "46082008168", "inventory": [ { "id": "MH001", "name": "Thép phi 12", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH002", "name": "Thép phi 14", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH003", "name": "Thép phi 16", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH004", "name": "Thép phi 6", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH005", "name": "Xi măng Hoàng Thanh Sơn PCB40", "unit": "Tấn", "qty": 0, "price": 1276000 }, { "id": "MH006", "name": "Xi măng Hoàng Thanh Sơn PCB30", "unit": "Tấn", "qty": 67, "price": 1199000 }, { "id": "MH007", "name": "Xi măng Nghi Sơn PCB 40", "unit": "Tấn", "qty": 106.65, "price": 1663200 }, { "id": "MH008", "name": "Cát vàng dùng trong xây dựng", "unit": "M3", "qty": 0, "price": 199700 } ] },
@@ -133,15 +132,14 @@
         let currentNNT = "";
 
         document.addEventListener("DOMContentLoaded", () => {
-            // Đọc lại từ v3 để giữ nguyên dữ liệu vừa nạp, lưu sang v4
-            let savedDB = localStorage.getItem('invoice_db_v4') || localStorage.getItem('invoice_db_v3');
+            let savedDB = localStorage.getItem('invoice_db_v5') || localStorage.getItem('invoice_db_v4') || localStorage.getItem('invoice_db_v3');
             
             if (savedDB) {
                 db = JSON.parse(savedDB);
             } else {
                 db = defaultDB;
             }
-            saveDB(); // Lưu ngay lên v4
+            saveDB(); 
 
             const selectEl = document.getElementById('nnt-select');
             for (let key in db) {
@@ -169,7 +167,6 @@
                     let id = itemEl.getAttribute('data-id');
                     let itemData = db[currentNNT].inventory.find(i => i.id === id);
 
-                    // GIAO DIỆN MỚI: ĐÃ LƯỢC BỎ DROPDOWN THUẾ SUẤT
                     itemEl.innerHTML = `
                         <div class="w-full bg-white p-3 rounded shadow-sm border-l-4 border-emerald-500 relative">
                             <div class="flex justify-between items-center mb-2">
@@ -194,7 +191,6 @@
                                     <input type="number" class="w-full p-2 border border-slate-300 rounded text-sm price-input focus:ring-2 focus:ring-blue-500" value="${itemData.price}" onchange="calculateTotal()" onkeyup="calculateTotal()">
                                 </div>
                             </div>
-                            
                             <div class="mt-3 flex justify-end items-center border-t border-emerald-100 pt-2">
                                  <div class="text-right">
                                      <span class="text-xs text-slate-500 mr-2">Thành tiền:</span>
@@ -210,7 +206,7 @@
         });
 
         function saveDB() {
-            localStorage.setItem('invoice_db_v4', JSON.stringify(db));
+            localStorage.setItem('invoice_db_v5', JSON.stringify(db));
         }
 
         function changeNNT() {
@@ -245,7 +241,6 @@
             let invoiceContainer = document.getElementById('invoice-items');
             let itemEl = document.createElement('div');
             itemEl.className = "mb-3";
-            // GIAO DIỆN MỚI: ĐÃ LƯỢC BỎ DROPDOWN THUẾ SUẤT
             itemEl.innerHTML = `
                 <div class="w-full bg-white p-3 rounded shadow-sm border-l-4 border-emerald-500 relative">
                     <div class="flex justify-between items-center mb-2">
@@ -270,7 +265,6 @@
                             <input type="number" class="w-full p-2 border border-slate-300 rounded text-sm price-input focus:ring-2 focus:ring-blue-500" value="${itemData.price}" onchange="calculateTotal()" onkeyup="calculateTotal()">
                         </div>
                     </div>
-                    
                     <div class="mt-3 flex justify-end items-center border-t border-emerald-100 pt-2">
                          <div class="text-right">
                              <span class="text-xs text-slate-500 mr-2">Thành tiền:</span>
@@ -410,6 +404,7 @@
             }
         }
 
+        // ================= HÀM XUẤT EXCEL CHUẨN FORM S-INVOICE =================
         function exportAndDeduct() {
             const itemEls = document.getElementById('invoice-items').querySelectorAll('.bg-white');
             if(itemEls.length === 0) {
@@ -444,41 +439,71 @@
                 return;
             }
 
-            let excelData = [[
-                "Tên người mua", "Tên đơn vị", "Mã số thuế", "Địa chỉ", "Hình thức thanh toán", 
-                "Loại tiền", "Mã hàng", "Tên hàng hóa, dịch vụ", "Đơn vị tính", "Số lượng", 
-                "Đơn giá", "Thành tiền", "Thuế suất (%)", "Tiền thuế"
-            ]];
+            // MẢNG LƯU TRỮ 10 DÒNG HEADER ĐÚNG CHUẨN FILE "EInvoice_BM_lap_hoa_don_2-001"
+            let excelData = [
+                ["", "", "", "", "", "", "", "", "", "", "", "", "", "TEMPLATE IMPORT HÓA ĐƠN\n(hệ thống hóa đơn điện tử sinvoice.viettel.vn)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
+                ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
+                ["Lưu ý: Những trường có dấu * là bắt buộc nhập; bắt buộc nhập 1 trong 2 giá trị Họ tên hoặc Tên đơn vị", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
+                ["Thuế GTGT : Các giá trị thuế -3; -2; -1; 0; 5; 8; 10. Trong đó Hoá đơn cho thuê tài chính: -3, Hàng hóa không chịu thuế là: -2, Không phải kê khai tính thuế: -1, Khác: điền % thuế", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
+                ["Tiền thuế: Các giá trị cách nhau bởi dấu chấm phẩy \";”. Với Thuế suất -3 (Hóa đơn cho thuê tài chính), người dùng lưu ý nhập tiền thuế", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
+                ["Với Tài khoản ràng buộc dữ liệu, Thành tiền luôn được tính bằng (Số lượng * Đơn giá)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
+                ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
+                ["STT", "Nhóm hóa đơn (*)", "Thông tin người mua", "", "", "", "", "", "", "", "", "", "", "", "", "", "Thông tin người bán", "", "Thông tin giao dịch", "", "", "", "", "", "Thông tin hàng hóa", "", "", "", "", "", "", "", "", "", "", "0 ", "Tỷ lệ % theo doanh thu"], 
+                ["", "", "Người mua không lấy HĐ", "Mã KH", "Họ tên", "Địa chỉ", "Số điện thoại", "Email", "Mã số thuế", "Mã đơn vị quan hệ ngân sách", "Loại giấy tờ", "Số giấy tờ", "Tên đơn vị", "Tên ngân hàng", "Tài khoản ngân hàng", "Hợp đồng số", "Mã cửa hàng", "Tên cửa hàng", "Hình thức thanh toán (*)", "Thanh toán\n(*)", "Loại tiền \n(*)", "Tỷ giá", "Số bảng kê", "Ngày bảng kê", "Loại hàng hóa", "Loại hàng hoá đặc trưng", "Mã hàng hóa/dịch vụ", "Tên hàng hóa/dịch vụ (*)", "Ghi chú", "Số lô", "Hạn dùng", "Đơn vị tính", "Số lượng (*)", "Đơn giá (*)", "Thành tiền (*)", "Tỷ lệ % theo doanh thu (hàng hóa) ", "Tỷ lệ % theo doanh thu "], 
+                ["itemNo", "group", "", "buyerCode", "buyerName", "buyerAddress", "buyerPhone", "buyerEmail", "buyerTaxCode", "budgetaryUnitCode", "buyerIdType", "buyerIdNo", "buyerLegalName", "buyerBankName", "buyerBankAccount", "contactNo", "storeCode", "storeName", "payMethod", "payStatus", "currencyCode", "exchangeRate", "detailedListNo", "detailedListDate", "selection", "itemType", "itemCode", "itemName", "itemNote", "batchNo", "expDate", "itemUnit", "itemQuantity", "itemPrice", "amountBeforeTax", "adjustRatio ", "domain "]
+            ];
 
+            // ĐẨY TỪNG MẶT HÀNG VÀO ĐÚNG TỌA ĐỘ 37 CỘT
             itemsToExport.forEach((item, index) => {
                 let total = item.sellQty * item.price;
+                
+                // Tạo một dòng trống gồm 37 ô
+                let row = new Array(37).fill("");
+                
+                // Cột Nhóm hóa đơn (Để hệ thống S-Invoice gom các mặt hàng chung 1 tờ hóa đơn)
+                row[1] = "1"; 
+                
+                // Cột Thông tin khách hàng & Giao dịch
+                row[4] = "Người mua không lấy hóa đơn"; // Họ tên
+                row[18] = "TM/CK"; // Hình thức thanh toán
+                row[19] = 1;       // Trạng thái thanh toán (1 = Đã thanh toán)
+                row[20] = "VND";   // Loại tiền
+                row[21] = 1;       // Tỷ giá
+                
+                // Cột Thông tin hàng hóa
+                row[24] = 1;             // Loại hàng hóa (1 = Hàng hóa/Dịch vụ)
+                row[26] = item.id;       // Mã hàng
+                row[27] = item.name;     // Tên hàng
+                row[31] = item.unit;     // ĐVT
+                row[32] = item.sellQty;  // Số lượng
+                row[33] = item.price;    // Đơn giá
+                row[34] = total;         // Thành tiền
+                row[35] = "1.0";         // Tỷ lệ % theo doanh thu (hàng hóa) - giữ nguyên như file mẫu
 
-                // Xuất file Hóa đơn bán hàng: Cột Thuế suất và Tiền thuế để trống ("")
-                excelData.push([
-                    "Khách lẻ không lấy hóa đơn", "", "", "", "TM/CK", "VND", 
-                    item.id, item.name, item.unit, item.sellQty, item.price, total, "", "" 
-                ]);
+                excelData.push(row);
 
+                // Trừ kho trên trình duyệt
                 item.dbItem.qty -= item.sellQty;
             });
 
             saveDB();
 
             const ws = XLSX.utils.aoa_to_sheet(excelData);
-            const wscols = [
-                {wch: 25}, {wch: 15}, {wch: 15}, {wch: 15}, {wch: 18}, {wch: 10}, 
-                {wch: 12}, {wch: 40}, {wch: 10}, {wch: 10}, {wch: 15}, {wch: 15}, 
-                {wch: 12}, {wch: 15}
-            ];
+            
+            // Căn chỉnh thẩm mỹ một số cột quan trọng cho dễ nhìn (không bắt buộc)
+            const wscols = [];
+            for(let i = 0; i < 37; i++) wscols.push({wch: 12});
+            wscols[4] = {wch: 30}; // buyerName
+            wscols[27] = {wch: 40}; // itemName
             ws['!cols'] = wscols;
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Import_SInvoice");
             
             let dateStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
-            XLSX.writeFile(wb, `DuLieuXuat_${db[currentNNT].mst}_${dateStr}.xlsx`);
+            XLSX.writeFile(wb, `Import_SInvoice_${db[currentNNT].mst}_${dateStr}.xlsx`);
 
-            alert("✅ LẬP HÓA ĐƠN BÁN HÀNG THÀNH CÔNG!\n- File Excel đã được tải về máy.\n- Hàng tồn kho đã được trừ tự động.");
+            alert("✅ ĐÃ CHỐT XUẤT HÓA ĐƠN!\n- File Excel đã tải xuống thành công, sẵn sàng upload lên S-Invoice.\n- Hàng tồn kho của hệ thống đã tự động bị trừ.");
             clearInvoice();
             renderHTK(document.getElementById('search-htk').value);
             renderImportTable();
