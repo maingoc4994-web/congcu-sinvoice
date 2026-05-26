@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.0/Sortable.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
 <body class="bg-slate-100 p-4 md:p-8 font-sans">
 
@@ -14,7 +15,7 @@
         
         <div class="bg-blue-700 text-white p-6 flex flex-col md:flex-row justify-between items-center gap-4">
             <h1 class="text-2xl font-bold flex items-center">
-                <span class="mr-3">📦</span> Kho & S-Invoice (Bản Chuẩn File Mẫu Viettel)
+                <span class="mr-3">📦</span> Kho & S-Invoice (Bản V7 - Gom HĐ & Xuất Ảnh)
             </h1>
             
             <div class="flex items-center bg-blue-800 p-2 rounded-lg">
@@ -26,17 +27,17 @@
 
         <div class="flex border-b border-slate-200 bg-slate-50">
             <button onclick="switchTab('export-tab')" id="btn-export-tab" class="flex-1 py-4 font-bold text-blue-700 border-b-4 border-blue-700 bg-white transition">
-                📤 XUẤT HÓA ĐƠN & TRỪ KHO
+                📤 BÀN LÀM VIỆC LẬP HÓA ĐƠN
             </button>
             <button onclick="switchTab('import-tab')" id="btn-import-tab" class="flex-1 py-4 font-bold text-slate-500 hover:text-emerald-600 hover:bg-emerald-50 transition border-b-4 border-transparent">
-                📥 NHẬP KHO & ĐIỀU CHỈNH GIÁ
+                📥 NHẬP KHO & ĐỒNG BỘ DỮ LIỆU
             </button>
         </div>
 
         <div class="p-6">
             <div id="export-tab" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 
-                <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-sm flex flex-col h-[650px]">
+                <div class="bg-blue-50/50 p-5 rounded-xl border border-blue-200 shadow-sm flex flex-col h-[750px]">
                     <h3 class="text-lg font-bold text-blue-800 mb-4 border-b border-blue-200 pb-2 flex justify-between">
                         <span>1. Kho Hàng (Kéo hoặc Click đúp)</span>
                         <span id="htk-count" class="text-sm bg-blue-200 text-blue-800 px-2 py-1 rounded-full">0</span>
@@ -48,10 +49,10 @@
                     </div>
                 </div>
 
-                <div class="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 shadow-sm flex flex-col h-[650px]">
+                <div class="bg-emerald-50/50 p-5 rounded-xl border border-emerald-200 shadow-sm flex flex-col h-[750px]">
                     <h3 class="text-lg font-bold text-emerald-800 mb-4 border-b border-emerald-200 pb-2 flex justify-between">
-                        <span>2. Hóa đơn chờ xuất</span>
-                        <button onclick="clearInvoice()" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded font-bold transition shadow-sm">Làm mới hóa đơn</button>
+                        <span id="current-invoice-title">2. Đang soạn: Hóa đơn số 1</span>
+                        <button onclick="clearInvoice()" class="text-xs bg-red-100 text-red-600 hover:bg-red-200 px-3 py-1 rounded font-bold transition shadow-sm">Xóa trắng</button>
                     </h3>
                     
                     <div id="invoice-items" class="space-y-3 flex-1 overflow-y-auto border-2 border-dashed border-emerald-300 p-3 rounded-lg bg-emerald-50/30">
@@ -59,17 +60,47 @@
                     
                     <div class="mt-4 pt-4 border-t border-emerald-300">
                         <div class="flex justify-between items-center mb-4">
-                            <span class="text-lg font-bold text-slate-700">Tổng Tiền Hàng:</span>
+                            <span class="text-lg font-bold text-slate-700">Cộng tiền HĐ này:</span>
                             <span id="total-amount" class="text-2xl font-black text-red-600">0 VNĐ</span>
                         </div>
-                        <button onclick="exportAndDeduct()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-4 px-6 rounded-lg shadow-lg transition flex justify-center items-center text-lg">
-                            <span class="mr-2">✔️</span> CHỐT XUẤT HÓA ĐƠN & TRỪ KHO (EXCEL)
+                        
+                        <button onclick="addInvoiceToBatch()" id="btn-add-batch" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-lg shadow-md transition flex justify-center items-center text-base mb-4">
+                            <span class="mr-2">➕</span> GOM HÓA ĐƠN NÀY (ĐỂ TẠO TIẾP HĐ KHÁC)
+                        </button>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border-2 border-emerald-500 shadow-inner">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-emerald-800 flex items-center">
+                                📑 Danh sách đã gom: <span id="batch-count" class="ml-2 bg-emerald-200 text-emerald-800 px-2 py-0.5 rounded-full text-sm">0 HĐ</span>
+                            </h4>
+                            <button onclick="cancelBatch()" class="text-xs font-bold text-red-500 hover:text-red-700 underline">Hủy lô & Trả kho</button>
+                        </div>
+                        <p class="text-sm text-slate-500 mb-3" id="batch-summary">Chưa có hóa đơn nào được gom.</p>
+                        
+                        <button onclick="exportBatchToExcel()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-lg shadow-lg transition flex justify-center items-center text-lg disabled:opacity-50" id="btn-export" disabled>
+                            <span class="mr-2">✔️</span> XUẤT FILE EXCEL S-INVOICE
                         </button>
                     </div>
                 </div>
             </div>
 
             <div id="import-tab" class="hidden">
+                <div class="flex flex-wrap gap-4 mb-6 bg-blue-50 p-4 rounded-xl border border-blue-200">
+                    <button onclick="exportInventoryJPG()" class="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-bold py-3 px-6 rounded-lg shadow transition flex justify-center items-center">
+                        <span class="mr-2">📸</span> XUẤT FILE TỒN KHO (.JPG)
+                    </button>
+                    <button onclick="downloadBackup()" class="flex-1 bg-slate-700 hover:bg-slate-800 text-white font-bold py-3 px-6 rounded-lg shadow transition flex justify-center items-center">
+                        <span class="mr-2">💾</span> Tải Dữ Liệu Sao Lưu
+                    </button>
+                    <div class="flex-1 relative">
+                        <input type="file" id="backupInput" accept=".json" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer" onchange="restoreBackup(event)">
+                        <button class="w-full h-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-6 rounded-lg shadow transition flex justify-center items-center">
+                            <span class="mr-2">🔄</span> Nạp Dữ Liệu Đồng Bộ
+                        </button>
+                    </div>
+                </div>
+
                 <div class="bg-slate-50 p-6 rounded-xl border border-slate-200 shadow-sm mb-8">
                     <h3 class="text-lg font-bold text-slate-800 mb-4 flex items-center">
                         <span class="bg-blue-600 text-white px-2 py-1 rounded-md mr-2 text-sm">+</span> Bổ sung hàng mới hoặc nhập thêm số lượng
@@ -117,31 +148,57 @@
         </div>
     </div>
 
-    <script>
-        const defaultDB = {
-            "46078002100": { "name": "Nguyễn Chương (MST: 46078002100)", "mst": "46078002100", "inventory": [ { "id": "MH001", "name": "Đá dăm 10x20", "unit": "m3", "qty": 0, "price": 370000 }, { "id": "MH002", "name": "Xi măng bao đa dụng PCB 30 Kaito", "unit": "Tấn", "qty": 0, "price": 1140000 }, { "id": "MH003", "name": "Xi măng bao đa dụng PCB 40 Kaito", "unit": "Tấn", "qty": 0, "price": 1200000 }, { "id": "MH004", "name": "Thép phi 10 Hòa Phát", "unit": "kg", "qty": 1000.0, "price": 17200 }, { "id": "MH005", "name": "Thép phi 12 Hòa Phát", "unit": "kg", "qty": 1090.0, "price": 16900 }, { "id": "MH006", "name": "Thép phi 14 Hoà Phát", "unit": "kg", "qty": 3006.0, "price": 18000 }, { "id": "MH007", "name": "Thép phi 16 Hòa Phát", "unit": "kg", "qty": 3105.0, "price": 18200 }, { "id": "MH008", "name": "Thép phi 6 Hòa Phát", "unit": "kg", "qty": 1443.0, "price": 17800 }, { "id": "MH009", "name": "V(250842)D8SỢI DTY 300/96 SET C", "unit": "kg", "qty": 0, "price": 108500 }, { "id": "MH010", "name": "Xi măng Nghi Sơn PCB 40", "unit": "Tấn", "qty": 30, "price": 1586000 } ] },
-            "46082008168": { "name": "Trương Công Thọ (MST: 46082008168)", "mst": "46082008168", "inventory": [ { "id": "MH001", "name": "Thép phi 12", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH002", "name": "Thép phi 14", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH003", "name": "Thép phi 16", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH004", "name": "Thép phi 6", "unit": "Kg", "qty": 0, "price": 16700 }, { "id": "MH005", "name": "Xi măng Hoàng Thanh Sơn PCB40", "unit": "Tấn", "qty": 0, "price": 1276000 }, { "id": "MH006", "name": "Xi măng Hoàng Thanh Sơn PCB30", "unit": "Tấn", "qty": 67, "price": 1199000 }, { "id": "MH007", "name": "Xi măng Nghi Sơn PCB 40", "unit": "Tấn", "qty": 106.65, "price": 1663200 }, { "id": "MH008", "name": "Cát vàng dùng trong xây dựng", "unit": "M3", "qty": 0, "price": 199700 } ] },
-            "46190007541": { "name": "Cườm Mai (MST: 46190007541)", "mst": "46190007541", "inventory": [ { "id": "MH001", "name": "Thép phi 10", "unit": "Kg", "qty": 0, "price": 15800 }, { "id": "MH002", "name": "Thép phi 16", "unit": "Kg", "qty": 0, "price": 15700 }, { "id": "MH003", "name": "Xi măng bao đa dụng PCB 30 Kaito", "unit": "Tấn", "qty": 15, "price": 1155000 }, { "id": "MH004", "name": "Xi măng Long Sơn PBC30", "unit": "Tấn", "qty": 0, "price": 1280000 }, { "id": "MH005", "name": "Ống nhựa 168 TD 4,0 ly", "unit": "Cây", "qty": 0, "price": 190800 }, { "id": "MH006", "name": "Ống TD PVC 200 x 4.0", "unit": "Mét", "qty": 0, "price": 73100 }, { "id": "MH007", "name": "Co mỏng 49", "unit": "Cái", "qty": 0, "price": 7000 }, { "id": "MH008", "name": "Co mỏng 110", "unit": "Cái", "qty": 0, "price": 44200 }, { "id": "MH009", "name": "Gạch sân vườn định hình 500x500 (6 viên) MTCS52009A1", "unit": "Hộp", "qty": 141, "price": 140300 } ] },
-            "46087020516": { "name": "Huỳnh Văn Nghiệp (MST: 46087020516)", "mst": "46087020516", "inventory": [ { "id": "MH001", "name": "Thép phi 10", "unit": "Kg", "qty": 0, "price": 15100 }, { "id": "MH002", "name": "Xi Măng Kim Đỉnh PCB30", "unit": "Tấn", "qty": 0, "price": 1603000 }, { "id": "MH003", "name": "Gạch đặc nhỏ", "unit": "Viên", "qty": 4403, "price": 1900 }, { "id": "MH004", "name": "Gạch 6 lỗ nhỏ", "unit": "Viên", "qty": 1497, "price": 2300 }, { "id": "MH005", "name": "Gạch 6 lỗ nhỏ 1/2", "unit": "Viên", "qty": 148, "price": 1700 }, { "id": "MH006", "name": "Xi măng Long Sơn Pcb30", "unit": "Tấn", "qty": 20, "price": 1700000 }, { "id": "MH007", "name": "Xi măng bao đa dụng PCB 30 Kaito", "unit": "Tấn", "qty": 0, "price": 1700000 }, { "id": "MH008", "name": "GẠCH, GKH 190x190x95, 9521", "unit": "Thùng", "qty": 0, "price": 289800 }, { "id": "MH009", "name": "Gạch đồng tiền A1", "unit": "Viên", "qty": 0, "price": 18900 }, { "id": "MH010", "name": "Gạch hạ uydi A1", "unit": "Viên", "qty": 0, "price": 18900 } ] },
-            "46159009984": { "name": "Nguyễn Thị Sen (MST: 46159009984)", "mst": "46159009984", "inventory": [ { "id": "MH001", "name": "Xi măng Bỉm Sơn PCB30", "unit": "Tấn", "qty": 18, "price": 2050000 }, { "id": "MH002", "name": "Gạch bậc cầu thang 1200x300 cotto men đen chấm bi trắng A1", "unit": "Viên", "qty": 0, "price": 250800 }, { "id": "MH003", "name": "Gạch cổ bậc 1200x150 cotto men đen chấm bi trắng A1", "unit": "Viên", "qty": 0, "price": 59600 } ] },
-            "46086007277": { "name": "HKD Thanh Thoạn (MST: 46086007277)", "mst": "46086007277", "inventory": [ { "id": "MH001", "name": "Xi măng Nghi Sơn PCB 40", "unit": "tấn", "qty": 60, "price": 1692900 }, { "id": "MH002", "name": "Cát vàng dùng trong xây dựng", "unit": "M3", "qty": 5, "price": 199700 }, { "id": "MH003", "name": "Đá dăm 10x20 ( tại máy xay Khe Băng )", "unit": "m³", "qty": 67.9, "price": 352000 }, { "id": "MH004", "name": "Xi măng Tân Trường bao PCB40", "unit": "tấn", "qty": 10, "price": 1100000 }, { "id": "MH005", "name": "Xi măng Tân Trường bao PCB30", "unit": "tấn", "qty": 11.1, "price": 1018500 }, { "id": "MH006", "name": "Thép phi 10 Hòa Phát", "unit": "kg", "qty": 2898.0, "price": 18600 } ] },
-            "46169001328": { "name": "Châu Thị Vân (MST: 46169001328)", "mst": "46169001328", "inventory": [ { "id": "MH001", "name": "Bưởi", "unit": "kg", "qty": 633.6, "price": 35000 }, { "id": "MH002", "name": "Cam", "unit": "kg", "qty": 1291.92, "price": 25000 }, { "id": "MH003", "name": "Chanh", "unit": "kg", "qty": 37, "price": 45000 }, { "id": "MH004", "name": "Dưa hấu", "unit": "kg", "qty": 22.3, "price": 12000 }, { "id": "MH005", "name": "Dưa hấu lai", "unit": "kg", "qty": 184.8, "price": 14000 }, { "id": "MH006", "name": "Dưa lưới", "unit": "kg", "qty": 254.7, "price": 35000 }, { "id": "MH007", "name": "Kiwi", "unit": "kg", "qty": 46.54, "price": 200000 }, { "id": "MH008", "name": "Lê", "unit": "kg", "qty": 495.57, "price": 40000 }, { "id": "MH009", "name": "Mận", "unit": "kg", "qty": 244.5, "price": 45000 }, { "id": "MH010", "name": "Nhãn", "unit": "kg", "qty": 400.9, "price": 45000 }, { "id": "MH011", "name": "Nho", "unit": "kg", "qty": 596.44, "price": 200000 }, { "id": "MH012", "name": "Quýt", "unit": "kg", "qty": 310.5, "price": 50000 }, { "id": "MH013", "name": "Táo gala", "unit": "kg", "qty": 6.16, "price": 70000 }, { "id": "MH014", "name": "Thanh long", "unit": "kg", "qty": 93, "price": 20000 }, { "id": "MH015", "name": "Thơm quả", "unit": "kg", "qty": 385.72, "price": 22000 }, { "id": "MH016", "name": "Vú sữa", "unit": "kg", "qty": 17.9, "price": 45000 } ] }
-        };
+    <div id="hidden-report-container" style="position: absolute; left: -9999px; top: 0; background: white; width: 800px; padding: 40px; color: black; font-family: sans-serif;">
+        <div style="text-align: center; margin-bottom: 20px;">
+            <h2 style="font-size: 24px; font-weight: bold; margin: 0;">BẢNG TỔNG HỢP HÀNG TỒN KHO</h2>
+            <p style="margin: 5px 0; font-size: 16px;" id="jpg-hkd-name">Tên HKD: </p>
+            <p style="margin: 5px 0; font-size: 16px;" id="jpg-mst">Mã Số Thuế: </p>
+            <p style="margin: 5px 0; font-style: italic; color: #555;" id="jpg-date">Ngày cập nhật: </p>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+            <thead>
+                <tr style="background-color: #f1f5f9;">
+                    <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">STT</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: left;">Tên mặt hàng</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">ĐVT</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">Số lượng tồn</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">Đơn giá</th>
+                    <th style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">Thành tiền</th>
+                </tr>
+            </thead>
+            <tbody id="jpg-table-body">
+            </tbody>
+            <tfoot>
+                <tr>
+                    <td colspan="5" style="border: 1px solid #cbd5e1; padding: 10px; text-align: right; font-weight: bold; font-size: 18px;">TỔNG CỘNG GIÁ TRỊ TỒN KHO:</td>
+                    <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: right; font-weight: bold; font-size: 18px; color: #dc2626;" id="jpg-grand-total">0</td>
+                </tr>
+            </tfoot>
+        </table>
+        <div style="text-align: right; font-style: italic; font-size: 14px; margin-top: 30px;">
+            Người lập biểu<br><br><br>..................................
+        </div>
+    </div>
 
+    <script>
         let db = {};
         let currentNNT = "";
+        let batchedInvoices = [];
+        let invoiceCounter = 1;
 
         document.addEventListener("DOMContentLoaded", () => {
-            let savedDB = localStorage.getItem('invoice_db_v5') || localStorage.getItem('invoice_db_v4') || localStorage.getItem('invoice_db_v3');
+            let savedDB = localStorage.getItem('invoice_db_v7') || localStorage.getItem('invoice_db_v6') || localStorage.getItem('invoice_db_v5') || localStorage.getItem('invoice_db_v4') || localStorage.getItem('invoice_db_v3');
             
             if (savedDB) {
                 db = JSON.parse(savedDB);
             } else {
-                db = defaultDB;
+                alert("Dữ liệu trống, vui lòng Nạp Dữ Liệu Đồng Bộ!");
+                db = {};
             }
             saveDB(); 
 
             const selectEl = document.getElementById('nnt-select');
+            selectEl.innerHTML = "";
             for (let key in db) {
                 let option = document.createElement('option');
                 option.value = key;
@@ -149,9 +206,11 @@
                 selectEl.appendChild(option);
             }
             
-            currentNNT = selectEl.value;
-            renderHTK();
-            renderImportTable();
+            if(Object.keys(db).length > 0){
+                currentNNT = selectEl.value;
+                renderHTK();
+                renderImportTable();
+            }
 
             new Sortable(document.getElementById('htk-list'), {
                 group: { name: 'shared', pull: 'clone', put: false },
@@ -173,10 +232,8 @@
                                 <span class="font-bold text-slate-800 item-name-val">${itemData.name}</span>
                                 <button onclick="this.closest('.bg-white').parentElement.remove(); calculateTotal()" class="text-red-500 hover:text-red-700 text-sm font-bold bg-red-50 px-2 py-1 rounded">Xóa bỏ</button>
                             </div>
-                            
                             <input type="hidden" class="item-id-val" value="${itemData.id}">
                             <input type="hidden" class="unit-input" value="${itemData.unit}">
-
                             <div class="grid grid-cols-3 gap-2 w-full mt-2">
                                 <div>
                                     <label class="text-xs text-slate-500 font-bold">Tồn kho hiện tại</label>
@@ -206,10 +263,100 @@
         });
 
         function saveDB() {
-            localStorage.setItem('invoice_db_v5', JSON.stringify(db));
+            localStorage.setItem('invoice_db_v7', JSON.stringify(db));
+        }
+
+        // ================= TÍNH NĂNG SAO LƯU & ĐỒNG BỘ =================
+        function downloadBackup() {
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(db));
+            const dlAnchorElem = document.createElement('a');
+            dlAnchorElem.setAttribute("href",     dataStr     );
+            dlAnchorElem.setAttribute("download", "DuLieu_HTK_Backup.json");
+            dlAnchorElem.click();
+        }
+
+        function restoreBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const importedDB = JSON.parse(e.target.result);
+                    if(confirm("Xác nhận nạp dữ liệu? Dữ liệu hiện tại sẽ bị ghi đè!")) {
+                        db = importedDB;
+                        saveDB();
+                        alert("✅ Nạp dữ liệu đồng bộ thành công! Trang web sẽ tải lại.");
+                        location.reload();
+                    }
+                } catch (error) {
+                    alert("❌ Lỗi: File sao lưu không hợp lệ.");
+                }
+            };
+            reader.readAsText(file);
+        }
+
+        // ================= TÍNH NĂNG XUẤT ẢNH JPG =================
+        function exportInventoryJPG() {
+            if(!db[currentNNT]) return;
+            
+            const nntData = db[currentNNT];
+            const inventory = nntData.inventory;
+            
+            // 1. Điền thông tin Header
+            document.getElementById('jpg-hkd-name').innerText = `Tên HKD: ${nntData.name}`;
+            document.getElementById('jpg-mst').innerText = `Mã Số Thuế: ${nntData.mst}`;
+            const now = new Date();
+            const dateString = `${now.getHours()}:${now.getMinutes()} - Ngày ${now.getDate()}/${now.getMonth()+1}/${now.getFullYear()}`;
+            document.getElementById('jpg-date').innerText = `Ngày cập nhật: ${dateString}`;
+
+            // 2. Tạo nội dung bảng
+            const tbody = document.getElementById('jpg-table-body');
+            tbody.innerHTML = "";
+            let grandTotal = 0;
+            let stt = 1;
+
+            inventory.forEach(item => {
+                if(item.qty > 0) {
+                    let total = item.qty * item.price;
+                    grandTotal += total;
+                    
+                    let tr = document.createElement('tr');
+                    tr.innerHTML = `
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${stt++}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: left; font-weight: bold;">${item.name}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: center;">${item.unit}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">${item.qty.toLocaleString('vi-VN')}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: right;">${item.price.toLocaleString('vi-VN')}</td>
+                        <td style="border: 1px solid #cbd5e1; padding: 10px; text-align: right; font-weight: bold;">${total.toLocaleString('vi-VN')}</td>
+                    `;
+                    tbody.appendChild(tr);
+                }
+            });
+
+            document.getElementById('jpg-grand-total').innerText = grandTotal.toLocaleString('vi-VN') + " VNĐ";
+
+            // 3. Gọi html2canvas chụp cái thẻ bị giấu
+            const captureArea = document.getElementById('hidden-report-container');
+            
+            html2canvas(captureArea, { scale: 2 }).then(canvas => {
+                // Tạo link tải ảnh
+                let link = document.createElement('a');
+                link.download = `TonKho_${nntData.mst}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 1.0);
+                link.click();
+            });
         }
 
         function changeNNT() {
+            if(batchedInvoices.length > 0) {
+                if(!confirm("Bạn đang gom dở một lô hóa đơn. Việc đổi NNT sẽ tự động Hủy lô hiện tại và trả lại hàng vào kho. Bạn có đồng ý?")) {
+                    document.getElementById('nnt-select').value = currentNNT;
+                    return;
+                }
+                cancelBatch(false); 
+            }
+
             currentNNT = document.getElementById('nnt-select').value;
             document.getElementById('search-htk').value = ""; 
             clearInvoice();
@@ -247,10 +394,8 @@
                         <span class="font-bold text-slate-800 item-name-val">${itemData.name}</span>
                         <button onclick="this.closest('.bg-white').parentElement.remove(); calculateTotal()" class="text-red-500 hover:text-red-700 text-sm font-bold bg-red-50 px-2 py-1 rounded">Xóa bỏ</button>
                     </div>
-                    
                     <input type="hidden" class="item-id-val" value="${itemData.id}">
                     <input type="hidden" class="unit-input" value="${itemData.unit}">
-
                     <div class="grid grid-cols-3 gap-2 w-full mt-2">
                         <div>
                             <label class="text-xs text-slate-500 font-bold">Tồn kho hiện tại</label>
@@ -404,17 +549,18 @@
             }
         }
 
-        // ================= HÀM XUẤT EXCEL CHUẨN FORM S-INVOICE =================
-        function exportAndDeduct() {
+        // ================= GOM HÓA ĐƠN & XUẤT EXCEL =================
+        function addInvoiceToBatch() {
             const itemEls = document.getElementById('invoice-items').querySelectorAll('.bg-white');
             if(itemEls.length === 0) {
-                alert("Bạn chưa chọn mặt hàng nào để xuất hóa đơn!");
+                alert("Bạn chưa chọn mặt hàng nào để lập hóa đơn!");
                 return;
             }
 
             let inventory = db[currentNNT].inventory;
             let errors = [];
-            let itemsToExport = [];
+            let itemsToBatch = [];
+            let totalAmountHĐ = 0;
 
             itemEls.forEach(el => {
                 let id = el.querySelector('.item-id-val').value;
@@ -426,20 +572,84 @@
                 let dbItem = inventory.find(i => i.id === id);
                 
                 if (sellQty <= 0) {
-                    errors.push(`- [${name}]: Số lượng xuất không hợp lệ (phải > 0).`);
+                    errors.push(`- [${name}]: Số lượng xuất không hợp lệ.`);
                 } else if (sellQty > dbItem.qty) {
-                    errors.push(`- [${name}]: Vượt quá hàng trong kho (Kho hiện tại chỉ có ${dbItem.qty} ${unit}).`);
+                    errors.push(`- [${name}]: Vượt quá hàng trong kho (${dbItem.qty} ${unit}).`);
                 } else {
-                    itemsToExport.push({ id, dbItem, name, unit, sellQty, price });
+                    itemsToBatch.push({ id, dbItem, name, unit, sellQty, price });
+                    totalAmountHĐ += (sellQty * price);
                 }
             });
 
             if(errors.length > 0) {
-                alert("⚠️ PHÁT HIỆN LỖI KHI XUẤT HÓA ĐƠN:\n\n" + errors.join("\n") + "\n\nVui lòng chỉnh lại số lượng trước khi chốt xuất.");
+                alert("⚠️ LỖI SỐ LƯỢNG:\n\n" + errors.join("\n") + "\n\nVui lòng chỉnh lại trước khi gom.");
                 return;
             }
 
-            // MẢNG LƯU TRỮ 10 DÒNG HEADER ĐÚNG CHUẨN FILE "EInvoice_BM_lap_hoa_don_2-001"
+            itemsToBatch.forEach((item) => {
+                item.dbItem.qty -= item.sellQty;
+            });
+
+            batchedInvoices.push({
+                group: invoiceCounter,
+                items: itemsToBatch,
+                total: totalAmountHĐ
+            });
+
+            saveDB();
+            invoiceCounter++;
+
+            updateBatchUI();
+            clearInvoice();
+            renderHTK(document.getElementById('search-htk').value);
+        }
+
+        function updateBatchUI() {
+            document.getElementById('current-invoice-title').innerText = `2. Đang soạn: Hóa đơn số ${invoiceCounter}`;
+            document.getElementById('btn-add-batch').innerHTML = `<span class="mr-2">➕</span> GOM HÓA ĐƠN NÀY (ĐỂ TẠO TIẾP HĐ SỐ ${invoiceCounter+1})`;
+            
+            document.getElementById('batch-count').innerText = `${batchedInvoices.length} HĐ`;
+            
+            let btnExport = document.getElementById('btn-export');
+            if(batchedInvoices.length > 0) {
+                let sumTotal = batchedInvoices.reduce((sum, inv) => sum + inv.total, 0);
+                document.getElementById('batch-summary').innerText = `Đã gom ${batchedInvoices.length} hóa đơn chờ xuất. Tổng giá trị: ${sumTotal.toLocaleString('vi-VN')} VNĐ`;
+                btnExport.disabled = false;
+                btnExport.classList.remove('opacity-50');
+            } else {
+                document.getElementById('batch-summary').innerText = `Chưa có hóa đơn nào được gom.`;
+                btnExport.disabled = true;
+                btnExport.classList.add('opacity-50');
+            }
+        }
+
+        function cancelBatch(showAlert = true) {
+            if(batchedInvoices.length === 0) return;
+            
+            if(showAlert && !confirm("Toàn bộ hóa đơn chờ xuất sẽ bị hủy, và số lượng sẽ được CỘNG TRẢ LẠI vào kho. Bạn chắc chắn chứ?")) {
+                return;
+            }
+
+            let inventory = db[currentNNT].inventory;
+            batchedInvoices.forEach(inv => {
+                inv.items.forEach(item => {
+                    let dbItem = inventory.find(i => i.id === item.id);
+                    if(dbItem) dbItem.qty += item.sellQty;
+                });
+            });
+
+            saveDB();
+            batchedInvoices = [];
+            invoiceCounter = 1;
+
+            updateBatchUI();
+            renderHTK(document.getElementById('search-htk').value);
+            if(showAlert) alert("Đã hủy lô thành công. Hàng hóa đã quay về kho nguyên vẹn!");
+        }
+
+        function exportBatchToExcel() {
+            if(batchedInvoices.length === 0) return;
+
             let excelData = [
                 ["", "", "", "", "", "", "", "", "", "", "", "", "", "TEMPLATE IMPORT HÓA ĐƠN\n(hệ thống hóa đơn điện tử sinvoice.viettel.vn)", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
                 ["", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""], 
@@ -453,59 +663,48 @@
                 ["itemNo", "group", "", "buyerCode", "buyerName", "buyerAddress", "buyerPhone", "buyerEmail", "buyerTaxCode", "budgetaryUnitCode", "buyerIdType", "buyerIdNo", "buyerLegalName", "buyerBankName", "buyerBankAccount", "contactNo", "storeCode", "storeName", "payMethod", "payStatus", "currencyCode", "exchangeRate", "detailedListNo", "detailedListDate", "selection", "itemType", "itemCode", "itemName", "itemNote", "batchNo", "expDate", "itemUnit", "itemQuantity", "itemPrice", "amountBeforeTax", "adjustRatio ", "domain "]
             ];
 
-            // ĐẨY TỪNG MẶT HÀNG VÀO ĐÚNG TỌA ĐỘ 37 CỘT
-            itemsToExport.forEach((item, index) => {
-                let total = item.sellQty * item.price;
-                
-                // Tạo một dòng trống gồm 37 ô
-                let row = new Array(37).fill("");
-                
-                // Cột Nhóm hóa đơn (Để hệ thống S-Invoice gom các mặt hàng chung 1 tờ hóa đơn)
-                row[1] = "1"; 
-                
-                // Cột Thông tin khách hàng & Giao dịch
-                row[4] = "Người mua không lấy hóa đơn"; // Họ tên
-                row[18] = "TM/CK"; // Hình thức thanh toán
-                row[19] = 1;       // Trạng thái thanh toán (1 = Đã thanh toán)
-                row[20] = "VND";   // Loại tiền
-                row[21] = 1;       // Tỷ giá
-                
-                // Cột Thông tin hàng hóa
-                row[24] = 1;             // Loại hàng hóa (1 = Hàng hóa/Dịch vụ)
-                row[26] = item.id;       // Mã hàng
-                row[27] = item.name;     // Tên hàng
-                row[31] = item.unit;     // ĐVT
-                row[32] = item.sellQty;  // Số lượng
-                row[33] = item.price;    // Đơn giá
-                row[34] = total;         // Thành tiền
-                row[35] = "1.0";         // Tỷ lệ % theo doanh thu (hàng hóa) - giữ nguyên như file mẫu
+            batchedInvoices.forEach(inv => {
+                inv.items.forEach(item => {
+                    let total = item.sellQty * item.price;
+                    let row = new Array(37).fill("");
+                    
+                    row[1] = inv.group; 
+                    row[4] = "Người mua không lấy hóa đơn"; 
+                    row[18] = "TM/CK"; 
+                    row[19] = 1;       
+                    row[20] = "VND";   
+                    row[21] = 1;       
+                    row[24] = 1;             
+                    row[26] = item.id;       
+                    row[27] = item.name;     
+                    row[31] = item.unit;     
+                    row[32] = item.sellQty;  
+                    row[33] = item.price;    
+                    row[34] = total;         
+                    row[35] = "1.0";         
 
-                excelData.push(row);
-
-                // Trừ kho trên trình duyệt
-                item.dbItem.qty -= item.sellQty;
+                    excelData.push(row);
+                });
             });
 
-            saveDB();
-
             const ws = XLSX.utils.aoa_to_sheet(excelData);
-            
-            // Căn chỉnh thẩm mỹ một số cột quan trọng cho dễ nhìn (không bắt buộc)
             const wscols = [];
             for(let i = 0; i < 37; i++) wscols.push({wch: 12});
-            wscols[4] = {wch: 30}; // buyerName
-            wscols[27] = {wch: 40}; // itemName
+            wscols[4] = {wch: 30}; 
+            wscols[27] = {wch: 40}; 
             ws['!cols'] = wscols;
 
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, "Import_SInvoice");
             
             let dateStr = new Date().toLocaleDateString('vi-VN').replace(/\//g, '-');
-            XLSX.writeFile(wb, `Import_SInvoice_${db[currentNNT].mst}_${dateStr}.xlsx`);
+            XLSX.writeFile(wb, `SInvoice_${batchedInvoices.length}HD_${db[currentNNT].mst}_${dateStr}.xlsx`);
 
-            alert("✅ ĐÃ CHỐT XUẤT HÓA ĐƠN!\n- File Excel đã tải xuống thành công, sẵn sàng upload lên S-Invoice.\n- Hàng tồn kho của hệ thống đã tự động bị trừ.");
-            clearInvoice();
-            renderHTK(document.getElementById('search-htk').value);
+            alert(`✅ ĐÃ XUẤT THÀNH CÔNG ${batchedInvoices.length} HÓA ĐƠN!\nFile đã sẵn sàng để up lên hệ thống Viettel S-Invoice.`);
+            
+            batchedInvoices = [];
+            invoiceCounter = 1;
+            updateBatchUI();
             renderImportTable();
         }
     </script>
